@@ -30,7 +30,7 @@ interface EmployeeDashboardProps {
 
 export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboardProps) {
   const { user } = useAuth();
-  const { projects, commentTasks, stages } = useData();
+  const { projects, commentTasks, stages, tasks } = useData();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
