@@ -57,18 +57,53 @@ export function TaskManager({ project }: TaskManagerProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate form data
+    if (!taskForm.title.trim()) {
+      alert('Task title is required');
+      return;
+    }
+    
+    if (!taskForm.description.trim()) {
+      alert('Task description is required');
+      return;
+    }
+    
+    if (!taskForm.assigned_to) {
+      alert('Please select an employee to assign the task to');
+      return;
+    }
+
+    console.log('Submitting task form:', taskForm);
+    console.log('Current user:', user);
+    console.log('Selected project:', project);
+
     try {
       if (editingTask) {
         await updateTask(editingTask.id, {
           ...taskForm,
+          priority: taskForm.priority || 'medium',
           updated_at: new Date().toISOString()
         });
       } else {
-        await createTask({
+        const taskData = {
           ...taskForm,
           project_id: project.id,
           created_by: user?.id || '',
-          status: 'open'
+          status: 'open' as const,
+          priority: taskForm.priority || 'medium' as const
+        };
+        
+        console.log('Creating task with data:', taskData);
+        
+        await createTask({
+          title: taskData.title,
+          description: taskData.description,
+          assigned_to: taskData.assigned_to,
+          project_id: taskData.project_id,
+          created_by: taskData.created_by,
+          status: taskData.status,
+          priority: taskData.priority,
+          deadline: taskData.deadline || undefined
         });
       }
       
@@ -81,9 +116,12 @@ export function TaskManager({ project }: TaskManagerProps) {
         deadline: '',
         priority: 'medium'
       });
+      
+      console.log('Task operation completed successfully');
     } catch (error) {
       console.error('Error saving task:', error);
-      alert('Error saving task. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Error saving task: ${errorMessage}`);
     }
   };
 

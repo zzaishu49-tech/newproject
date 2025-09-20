@@ -95,7 +95,7 @@ export interface Task {
   assigned_to: string;
   created_by: string;
   status: 'open' | 'in-progress' | 'done';
-  priority?: 'low' | 'medium' | 'high';
+  priority: 'low' | 'medium' | 'high';
   deadline?: string;
   created_at: string;
   updated_at?: string;

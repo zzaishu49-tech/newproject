@@ -289,6 +289,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     
     try {
+      console.log('Loading tasks from Supabase...');
+      
       const { data, error } = await supabase
         .from('tasks')
         .select(`
@@ -298,6 +300,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         `);
       
       if (!error && data) {
+      console.log('Raw tasks data from Supabase:', data);
+      
+        console.error('Error loading tasks:', error);
         const mappedTasks: Task[] = data.map((t: any) => ({
           id: t.id,
           project_id: t.project_id,
@@ -311,6 +316,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: t.created_at,
           updated_at: t.updated_at
         }));
+        
+        console.log('Mapped tasks:', mappedTasks);
         setTasks(mappedTasks);
       }
     } catch (error) {
@@ -638,38 +645,48 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
     if (supabase) {
       try {
+        // Ensure all required fields are present and properly formatted
+        const taskToInsert = {
+          project_id: taskData.project_id,
+          title: taskData.title,
+          description: taskData.description,
+          assigned_to: taskData.assigned_to,
+          created_by: taskData.created_by,
+          status: taskData.status || 'open',
+          priority: taskData.priority || 'medium',
+          deadline: taskData.deadline || null
+        };
+
+        console.log('Creating task with data:', taskToInsert);
+
         const { data, error } = await supabase
           .from('tasks')
-          .insert({
-            project_id: taskData.project_id,
-            title: taskData.title,
-            description: taskData.description,
-            assigned_to: taskData.assigned_to,
-            created_by: taskData.created_by,
-            status: taskData.status,
-            priority: taskData.priority,
-            deadline: taskData.deadline
-          })
+          .insert(taskToInsert)
           .select()
           .single();
 
         if (error) {
           console.error('Error creating task:', error);
+          console.error('Error details:', error.message, error.details, error.hint);
           throw error;
         }
+
+        console.log('Task created successfully:', data);
 
         // Refresh tasks to get the updated list
         await loadTasks();
       } catch (error) {
         console.error('Error creating task:', error);
-        throw error;
+        // Re-throw with more specific error message
+        throw new Error(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } else {
       // Fallback to local state if Supabase is not available
       const newTask: Task = {
         ...taskData,
         id: uuidv4(),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        priority: taskData.priority || 'medium'
       };
       setTasks(prev => [...prev, newTask]);
     }
