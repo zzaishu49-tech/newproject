@@ -293,11 +293,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       
       const { data, error } = await supabase
         .from('tasks')
-        .select(`
-          *,
-          assignee:profiles!tasks_assigned_to_fkey(full_name),
-          creator:profiles!tasks_created_by_fkey(full_name)
-        `);
+        .select('*');
       
       if (!error && data) {
       console.log('Raw tasks data from Supabase:', data);
