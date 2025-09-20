@@ -554,9 +554,9 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
           {/* Recent Tasks */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Tasks</h3>
-            {myTasks.slice(0, 5).length > 0 ? (
+            {actualTasks.slice(0, 5).length > 0 ? (
               <div className="space-y-3">
-                {myTasks.slice(0, 5).map(task => (
+                {actualTasks.slice(0, 5).map(task => (
                   <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-3 h-3 rounded-full ${
@@ -564,7 +564,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
                         task.status === 'in-progress' ? 'bg-blue-500' :
                         'bg-orange-500'
                       }`} />
-                      <span className="font-medium text-gray-900 truncate max-w-xs">{task.text}</span>
+                      <span className="font-medium text-gray-900 truncate max-w-xs">{task.title}</span>
                     </div>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       task.status === 'done' ? 'bg-green-100 text-green-800' :
