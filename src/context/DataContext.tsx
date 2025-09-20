@@ -324,9 +324,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         
         console.log('Mapped tasks:', mappedTasks);
         setTasks(mappedTasks);
+      } else if (error) {
+        console.error('Supabase error loading tasks:', error);
+        // Keep existing tasks or set empty array
+        console.log('Error loading tasks, keeping existing state');
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
+      console.log('Network error loading tasks, keeping existing state');
     }
   };
   useEffect(() => {
