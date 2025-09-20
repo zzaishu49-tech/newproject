@@ -302,7 +302,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!error && data) {
       console.log('Raw tasks data from Supabase:', data);
       
-        console.error('Error loading tasks:', error);
         const mappedTasks: Task[] = data.map((t: any) => ({
           id: t.id,
           project_id: t.project_id,
