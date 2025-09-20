@@ -257,6 +257,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     
     try {
+      console.log('Loading projects from Supabase...');
       const { data, error } = await supabase
         .from('projects')
         .select(`
@@ -265,6 +266,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         `);
       
       if (!error && data) {
+        console.log('Projects loaded successfully:', data.length);
         const mappedProjects: Project[] = data.map((p: any) => ({
           id: p.id,
           title: p.title,
@@ -279,9 +281,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
           priority: p.priority
         }));
         setProjects(mappedProjects);
+      } else if (error) {
+        console.error('Supabase error loading projects:', error);
+        // Fall back to mock data if Supabase fails
+        console.log('Falling back to mock data');
+        setProjects(mockProjects);
       }
     } catch (error) {
       console.error('Error loading projects:', error);
+      // Fall back to mock data if network request fails
+      console.log('Network error, falling back to mock data');
+      setProjects(mockProjects);
     }
   };
 
