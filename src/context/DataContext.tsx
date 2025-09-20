@@ -610,6 +610,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (supabase) await supabase.from('tasks').update({ status }).eq('id', taskId);
   };
 
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, ...updates } : task
+    ));
+    if (supabase) {
+      const { error } = await supabase
+        .from('tasks')
+        .update(updates)
+        .eq('id', taskId);
+      if (error) throw error;
+    }
+  };
+
+  const deleteTask = async (taskId: string) => {
+    setTasks(prev => prev.filter(task => task.id !== taskId));
+    if (supabase) {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+      if (error) throw error;
+    }
+  };
+
   const createBrochureProject = (clientId: string, clientName: string): string => {
     const newProject: BrochureProject = {
       id: uuidv4(),
@@ -803,6 +827,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       scheduleMeeting,
       createTask,
       updateTaskStatus,
+      updateTask,
+      deleteTask,
       createBrochureProject,
       updateBrochureProject,
       saveBrochurePage,

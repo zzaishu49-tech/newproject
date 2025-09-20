@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { ProjectCard } from '../Projects/ProjectCard';
-import { TaskCard } from '../Tasks/TaskCard';
+import { EmployeeTaskCard } from '../Tasks/EmployeeTaskCard';
 import { Project } from '../../types';
 import { 
   Briefcase, 
@@ -45,10 +45,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
   );
 
   // Get tasks assigned to current employee
-  const myTasks = commentTasks.filter(task => 
-    task.assigned_to === user?.id || 
-    (assignedProjects.some(p => p.id === task.project_id) && task.author_role !== 'employee')
-  );
+  const myTasks = tasks.filter(task => task.assigned_to === user?.id);
 
   const openTasks = myTasks.filter(task => task.status === 'open');
   const inProgressTasks = myTasks.filter(task => task.status === 'in-progress');
@@ -130,7 +127,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
             </h3>
             <div className="space-y-4">
               {openTasks.map(task => (
-                <TaskCard key={task.id} task={task} showProject={true} />
+                <EmployeeTaskCard key={task.id} task={task} showProject={true} />
               ))}
             </div>
           </div>
@@ -145,7 +142,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
             </h3>
             <div className="space-y-4">
               {inProgressTasks.map(task => (
-                <TaskCard key={task.id} task={task} showProject={true} />
+                <EmployeeTaskCard key={task.id} task={task} showProject={true} />
               ))}
             </div>
           </div>
@@ -160,7 +157,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
             </h3>
             <div className="space-y-4">
               {completedTasks.slice(0, 5).map(task => (
-                <TaskCard key={task.id} task={task} showProject={true} />
+                <EmployeeTaskCard key={task.id} task={task} showProject={true} />
               ))}
             </div>
           </div>
@@ -265,7 +262,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900">Project Tasks</h3>
               {myTasks.filter(task => task.project_id === selectedProject.id).map(task => (
-                <TaskCard key={task.id} task={task} showProject={false} />
+                <EmployeeTaskCard key={task.id} task={task} showProject={false} />
               ))}
               {myTasks.filter(task => task.project_id === selectedProject.id).length === 0 && (
                 <div className="text-center py-8 text-gray-500">

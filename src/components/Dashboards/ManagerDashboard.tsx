@@ -9,6 +9,7 @@ import { CommentManager } from '../Comments/CommentManager';
 import { BrochureReview } from '../Brochure/BrochureReview';
 import { DocumentDownloadCenter } from '../Documents/DocumentDownloadCenter';
 import { StageDetail } from '../Stages/StageDetail';
+import { TaskManager } from '../Tasks/TaskManager';
 import { Project, User, Lead } from '../../types';
 import { 
   Plus, 
@@ -846,18 +847,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
         <div>
           {projectDetailTab === 'brochure' && <BrochureReview />}
           {projectDetailTab === 'tasks' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900">Project Tasks</h3>
-              {allTasks.filter(task => task.project_id === selectedProject.id).map(task => (
-                <TaskCard key={task.id} task={task} showProject={false} />
-              ))}
-              {allTasks.filter(task => task.project_id === selectedProject.id).length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p>No tasks for this project</p>
-                </div>
-              )}
-            </div>
+            <TaskManager project={selectedProject} />
           )}
           {projectDetailTab === 'stages' && <StageDetail project={selectedProject} onBack={() => setShowProjectDetail(false)} />}
         </div>
