@@ -31,6 +31,8 @@ interface DataContextType {
   scheduleMeeting: (meeting: Omit<Meeting, 'id'>) => void;
   createTask: (task: Omit<Task, 'id' | 'created_at'>) => void;
   updateTaskStatus: (taskId: string, status: 'open' | 'in-progress' | 'done') => void;
+  updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   createBrochureProject: (clientId: string, clientName: string) => string;
   updateBrochureProject: (id: string, updates: Partial<BrochureProject>) => void;
   saveBrochurePage: (pageData: Omit<BrochurePage, 'id' | 'created_at' | 'updated_at'>) => void;
@@ -283,9 +285,42 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loadTasks = async () => {
+    if (!supabase) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select(`
+          *,
+          assignee:profiles!tasks_assigned_to_fkey(full_name),
+          creator:profiles!tasks_created_by_fkey(full_name)
+        `);
+      
+      if (!error && data) {
+        const mappedTasks: Task[] = data.map((t: any) => ({
+          id: t.id,
+          project_id: t.project_id,
+          title: t.title,
+          description: t.description,
+          assigned_to: t.assigned_to,
+          created_by: t.created_by,
+          status: t.status,
+          priority: t.priority,
+          deadline: t.deadline,
+          created_at: t.created_at,
+          updated_at: t.updated_at
+        }));
+        setTasks(mappedTasks);
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    }
+  };
   useEffect(() => {
     refreshUsers();
     loadProjects();
+    loadTasks();
     
     // Set up real-time subscriptions
     if (supabase) {
@@ -303,9 +338,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
         .subscribe();
 
+      const tasksSubscription = supabase
+        .channel('tasks')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+          loadTasks();
+        })
+        .subscribe();
       return () => {
         supabase.removeChannel(projectsSubscription);
         supabase.removeChannel(profilesSubscription);
+        supabase.removeChannel(tasksSubscription);
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -594,43 +636,128 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
-    const newTask: Task = {
-      ...taskData,
-      id: uuidv4(),
-      created_at: new Date().toISOString()
-    };
-    setTasks(prev => [...prev, newTask]);
-    if (supabase) await supabase.from('tasks').insert(newTask);
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert({
+            project_id: taskData.project_id,
+            title: taskData.title,
+            description: taskData.description,
+            assigned_to: taskData.assigned_to,
+            created_by: taskData.created_by,
+            status: taskData.status,
+            priority: taskData.priority,
+            deadline: taskData.deadline
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating task:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error creating task:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      const newTask: Task = {
+        ...taskData,
+        id: uuidv4(),
+        created_at: new Date().toISOString()
+      };
+      setTasks(prev => [...prev, newTask]);
+    }
   };
 
   const updateTaskStatus = async (taskId: string, status: 'open' | 'in-progress' | 'done') => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, status } : task
-    ));
-    if (supabase) await supabase.from('tasks').update({ status }).eq('id', taskId);
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status })
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error updating task status:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error updating task status:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, status } : task
+      ));
+    }
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(task => 
-      task.id === taskId ? { ...task, ...updates } : task
-    ));
     if (supabase) {
-      const { error } = await supabase
-        .from('tasks')
-        .update(updates)
-        .eq('id', taskId);
-      if (error) throw error;
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title: updates.title,
+            description: updates.description,
+            assigned_to: updates.assigned_to,
+            priority: updates.priority,
+            deadline: updates.deadline,
+            status: updates.status
+          })
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error updating task:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error updating task:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, ...updates } : task
+      ));
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    setTasks(prev => prev.filter(task => task.id !== taskId));
     if (supabase) {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', taskId);
-      if (error) throw error;
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error deleting task:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.filter(task => task.id !== taskId));
     }
   };
 

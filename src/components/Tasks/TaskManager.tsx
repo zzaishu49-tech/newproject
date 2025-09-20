@@ -136,7 +136,7 @@ export function TaskManager({ project }: TaskManagerProps) {
 
   const getAssigneeName = (assigneeId: string) => {
     const assignee = users.find(u => u.id === assigneeId);
-    return assignee?.name || 'Unknown User';
+    return assignee?.full_name || assignee?.name || 'Unknown User';
   };
 
   return (
@@ -199,7 +199,7 @@ export function TaskManager({ project }: TaskManagerProps) {
           >
             <option value="all">All Assignees</option>
             {assignedEmployees.map(employee => (
-              <option key={employee.id} value={employee.id}>{employee.name}</option>
+              <option key={employee.id} value={employee.id}>{employee.full_name || employee.name}</option>
             ))}
           </select>
         </div>
@@ -352,7 +352,7 @@ export function TaskManager({ project }: TaskManagerProps) {
                 >
                   <option value="">Select an employee</option>
                   {assignedEmployees.map(employee => (
-                    <option key={employee.id} value={employee.id}>{employee.name}</option>
+                    <option key={employee.id} value={employee.id}>{employee.full_name || employee.name}</option>
                   ))}
                 </select>
               </div>

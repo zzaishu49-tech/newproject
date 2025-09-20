@@ -45,11 +45,12 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
   );
 
   // Get tasks assigned to current employee
-  const myTasks = tasks.filter(task => task.assigned_to === user?.id);
+  const myTasks = commentTasks.filter(task => task.assigned_to === user?.id);
+  const actualTasks = tasks.filter(task => task.assigned_to === user?.id);
 
-  const openTasks = myTasks.filter(task => task.status === 'open');
-  const inProgressTasks = myTasks.filter(task => task.status === 'in-progress');
-  const completedTasks = myTasks.filter(task => task.status === 'done');
+  const openTasks = actualTasks.filter(task => task.status === 'open');
+  const inProgressTasks = actualTasks.filter(task => task.status === 'in-progress');
+  const completedTasks = actualTasks.filter(task => task.status === 'done');
 
   // Filter projects for the projects section
   const filteredProjects = assignedProjects.filter(project => {
