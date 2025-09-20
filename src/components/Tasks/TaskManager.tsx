@@ -100,7 +100,6 @@ export function TaskManager({ project }: TaskManagerProps) {
           description: taskData.description,
           assigned_to: taskData.assigned_to,
           project_id: taskData.project_id,
-          created_by: taskData.created_by,
           status: taskData.status,
           priority: taskData.priority,
           deadline: taskData.deadline || undefined

@@ -640,13 +640,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
     if (supabase) {
       try {
-        // Ensure all required fields are present and properly formatted
         const taskToInsert = {
           project_id: taskData.project_id,
           title: taskData.title,
           description: taskData.description,
           assigned_to: taskData.assigned_to,
-          created_by: taskData.created_by,
           status: taskData.status || 'open',
           priority: taskData.priority || 'medium',
           deadline: taskData.deadline || null
