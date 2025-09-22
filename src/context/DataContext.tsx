@@ -825,8 +825,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       pages: []
     };
     setBrochureProjects(prev => [...prev, newProject]);
-    // Optionally persist in Supabase table 'brochure_projects'
-    if (supabase) supabase.from('brochure_projects').insert(newProject);
+    if (supabase) {
+      supabase.from('brochure_projects').insert(newProject);
+    } else {
+      console.error('Supabase not configured - brochure project not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
     return newProject.id;
   };
 
@@ -1032,11 +1035,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       meetings,
       brochureProjects,
       brochurePages,
-    if (supabase) {
-      supabase.from('brochure_projects').insert(newProject);
-    } else {
-      console.error('Supabase not configured - brochure project not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
-    }
+      pageComments,
       leads,
       downloadHistory,
       createProject,
