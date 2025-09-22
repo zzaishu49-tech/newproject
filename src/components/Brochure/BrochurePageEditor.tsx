@@ -17,6 +17,7 @@ interface BrochurePageEditorProps {
   pageNumber: number;
   pageData: BrochurePage['content'];
   onDataChange: (data: BrochurePage['content']) => void;
+  debouncedOnDataChange: (data: BrochurePage['content']) => void;
   isEditable?: boolean;
 }
 
@@ -25,29 +26,38 @@ export function BrochurePageEditor({
   pageNumber, 
   pageData, 
   onDataChange,
+  debouncedOnDataChange,
   isEditable = true
 }: BrochurePageEditorProps) {
   const { uploadBrochureImage } = useData();
-  const [localData, setLocalData] = useState<BrochurePage['content']>(pageData);
   const [editorValue, setEditorValue] = useState<string>((pageData.body_content as string) || '');
   const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set());
+  const [lastPageNumber, setLastPageNumber] = useState(pageNumber);
 
+  // Only update editor value when page changes or when content is significantly different
   useEffect(() => {
-    setLocalData(pageData);
-    setEditorValue((pageData.body_content as string) || '');
-  }, [pageData]);
+    const newContent = (pageData.body_content as string) || '';
+    
+    // Update if page number changed (new page loaded) or if content is significantly different
+    if (pageNumber !== lastPageNumber || (newContent !== editorValue && !editorValue)) {
+      setEditorValue(newContent);
+      setLastPageNumber(pageNumber);
+    }
+  }, [pageData, pageNumber, lastPageNumber, editorValue]);
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleNonTextChange = (field: string, value: any) => {
     if (!isEditable) return;
-    const newData = { ...localData, [field]: value };
-    setLocalData(newData);
+    const newData = { ...pageData, [field]: value };
     onDataChange(newData);
   };
 
   const handleEditorChange = (html: string) => {
     if (!isEditable) return;
+    // Immediately update local editor state for smooth typing
     setEditorValue(html);
-    handleInputChange('body_content', html);
+    // Use debounced save for text content to avoid conflicts
+    const newData = { ...pageData, body_content: html };
+    debouncedOnDataChange(newData);
   };
 
   const handleFileUpload = (file: File) => {
@@ -57,7 +67,7 @@ export function BrochurePageEditor({
       return;
     }
     
-    const images = localData.images || [];
+    const images = pageData.images || [];
     const imageIndex = images.length;
     
     // Add to uploading set
@@ -66,7 +76,7 @@ export function BrochurePageEditor({
     // Upload to Supabase
     uploadBrochureImage(file, projectId)
       .then(url => {
-        handleInputChange('images', [...images, url]);
+        handleNonTextChange('images', [...images, url]);
         setUploadingImages(prev => {
           const newSet = new Set(prev);
           newSet.delete(imageIndex);
@@ -86,9 +96,9 @@ export function BrochurePageEditor({
 
   const removeImage = (index: number) => {
     if (!isEditable) return;
-    const images = localData.images || [];
+    const images = pageData.images || [];
     const newImages = images.filter((_, i) => i !== index);
-    handleInputChange('images', newImages);
+    handleNonTextChange('images', newImages);
   };
 
   const renderTooltip = (text: string) => (
@@ -148,9 +158,9 @@ export function BrochurePageEditor({
           </label>
           
           {/* Existing Images */}
-          {(localData.images || []).length > 0 && (
+          {(pageData.images || []).length > 0 && (
             <div className="space-y-3 mb-4">
-              {(localData.images || []).map((image, index) => (
+              {(pageData.images || []).map((image, index) => (
                 <div key={index} className="flex items-center space-x-4 p-3 border border-gray-200 rounded-lg bg-gray-50">
                   <img src={image} alt={`Image ${index + 1}`} className="w-16 h-16 object-cover rounded" />
                   <div className="flex-1">
@@ -203,7 +213,7 @@ export function BrochurePageEditor({
             </div>
           )}
 
-          {!isEditable && (localData.images || []).length === 0 && (
+          {!isEditable && (pageData.images || []).length === 0 && (
             <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
               <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500">No images uploaded</p>

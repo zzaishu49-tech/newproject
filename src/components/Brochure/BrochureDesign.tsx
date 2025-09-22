@@ -474,6 +474,7 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
             pageNumber={currentPage}
             pageData={pageData}
             onDataChange={setPageData}
+            debouncedOnDataChange={(data) => debouncedSave(currentProject.id, currentPage, data)}
             isEditable={isPageEditable() && canEdit}
           />
 
