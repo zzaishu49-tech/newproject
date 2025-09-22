@@ -39,8 +39,8 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardProps) {
-  const { projects, stages, commentTasks, leads, users, createLead, updateLead, deleteLead, createUserAccount, refreshUsers, loadProjects } = useData();
-  const { user } = useAuth(); // Get user from context
+  const { projects, stages, commentTasks, leads, users, createLead, updateLead, deleteLead, createUserAccount, refreshUsers, loadProjects, updateProject } = useData(); // Added updateProject
+  const { user } = useAuth();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -772,11 +772,11 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
   );
 
   const renderProjectDetail = () => {
-    if (!selectedProject || !user) return null; // Add user check
+    if (!selectedProject || !user) return null;
 
     const handleProgressUpdate = async (newProgress: number) => {
       try {
-        await updateProject(selectedProject.id, { progress_percentage: newProgress }, user); // Pass user
+        await updateProject(selectedProject.id, { progress_percentage: newProgress }, user);
         setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
       } catch (error) {
         console.error('Error updating project progress:', error);
