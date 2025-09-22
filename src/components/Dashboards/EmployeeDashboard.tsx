@@ -32,7 +32,7 @@ interface EmployeeDashboardProps {
 
 export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboardProps) {
   const { user } = useAuth();
-  const { projects, commentTasks, stages, tasks, updateProject } = useData();
+  const { projects, commentTasks, stages, tasks, brochureProjects, updateProject } = useData();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -308,7 +308,17 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
               )}
             </div>
           )}
-          {projectDetailTab === 'brochure' && <BrochureDesign />}
+          {projectDetailTab === 'brochure' && (() => {
+            // Find the brochure project for this client
+            const clientBrochureProject = brochureProjects.find(bp => bp.client_id === selectedProject.client_id);
+            
+            return (
+              <BrochureDesign 
+                initialBrochureProject={clientBrochureProject}
+                onBack={() => setProjectDetailTab('tasks')}
+              />
+            );
+          })()}
           {projectDetailTab === 'comments' && (
             <ProjectCommentSection project={selectedProject} />
           )}

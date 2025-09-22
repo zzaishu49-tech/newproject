@@ -45,15 +45,15 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   // Check if current user can edit this project
   const canEdit = useMemo(() => {
     if (!user || !currentProject) return false;
-    // If this is accessed from manager dashboard with initialBrochureProject, managers can't edit directly
-    if (user.role === 'manager' && !initialBrochureProject) return true;
+    // All roles can edit brochure projects
+    if (user.role === 'manager') return true;
     if (user.role === 'client' && currentProject.client_id === user.id) return true;
     if (user.role === 'employee') {
       const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
       return relatedProject && relatedProject.assigned_employees.includes(user.id);
     }
     return false;
-  }, [user, currentProject, projects, initialBrochureProject]);
+  }, [user, currentProject, projects]);
 
   // Get client's brochure projects
   const accessibleProjects = useMemo(() => {
@@ -67,13 +67,10 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
       return brochureProjects;
     } else if (user?.role === 'employee') {
       // Employee can see projects they're assigned to
-      const assignedProjectIds = projects
+      const assignedProjects = projects
         .filter(p => p.assigned_employees.includes(user.id))
-        .map(p => p.id);
-      return brochureProjects.filter(bp => {
-        const relatedProject = projects.find(p => p.client_id === bp.client_id);
-        return relatedProject && assignedProjectIds.includes(relatedProject.id);
-      });
+        .map(p => p.client_id);
+      return brochureProjects.filter(bp => assignedProjects.includes(bp.client_id));
     } else if (user?.role === 'client') {
       // Client can only see their own projects
       return brochureProjects.filter(project => project.client_id === user.id);
@@ -127,7 +124,21 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
 
   const handleCreateProject = () => {
     if (!user) return;
-    const projectId = createBrochureProject(user.id, user.name);
+    
+    // For managers and employees, create project for the first available client
+    let clientId = user.id;
+    let clientName = user.name;
+    
+    if (user.role === 'manager' || user.role === 'employee') {
+      // Find the first client or create for the current user
+      const firstClient = users.find(u => u.role === 'client');
+      if (firstClient) {
+        clientId = firstClient.id;
+        clientName = firstClient.name;
+      }
+    }
+    
+    const projectId = createBrochureProject(clientId, clientName);
     const newProject = brochureProjects.find(p => p.id === projectId);
     if (newProject) {
       setCurrentProject(newProject);
@@ -137,8 +148,9 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
 
   const handleSubmitProject = () => {
     if (!currentProject) return;
-    updateBrochureProject(currentProject.id, { status: 'ready_for_design' });
-    setCurrentProject(prev => prev ? { ...prev, status: 'ready_for_design' } : null);
+    // Just save the project - no status change needed
+    updateBrochureProject(currentProject.id, { updated_at: new Date().toISOString() });
+    setCurrentProject(prev => prev ? { ...prev, updated_at: new Date().toISOString() } : null);
   };
 
   const calculateProgress = () => {
@@ -209,11 +221,17 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   };
 
   const isPageEditable = () => {
-    if (user?.role === 'manager') return true; // Managers can always edit
+    if (user?.role === 'manager' || user?.role === 'employee') return true; // Managers and employees can always edit
     const page = getCurrentPage();
     return !page?.is_locked; // Others can only edit if page is not locked
   };
   if (!currentProject) {
+  // If initialBrochureProject is provided, go directly to the design interface
+  if (initialBrochureProject && !currentProject) {
+    setCurrentProject(initialBrochureProject);
+    return null; // Will re-render with currentProject set
+  }
+  
     return (
       <div className="p-6">
         <div className="mb-6">
@@ -239,12 +257,12 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
             <p className="text-gray-600 mb-6">
               {user?.role === 'client' 
                 ? 'Create your first brochure design project to get started'
-                : user?.role === 'manager'
+                : user?.role === 'manager' || user?.role === 'employee'
                 ? 'No brochure projects have been created yet'
-                : 'No brochure projects assigned to you yet'
+                : 'Create a new brochure project to get started'
               }
             </p>
-            {user?.role === 'client' && (
+            {(user?.role === 'client' || user?.role === 'manager' || user?.role === 'employee') && (
               <button
                 onClick={handleCreateProject}
                 className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
@@ -258,9 +276,10 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">
-                {user?.role === 'client' ? 'Your Brochure Projects' : 'Brochure Projects'}
+                {user?.role === 'client' ? 'Your Brochure Projects' : 
+                 user?.role === 'manager' ? 'All Brochure Projects' : 'Assigned Brochure Projects'}
               </h3>
-              {user?.role === 'client' && (
+              {(user?.role === 'client' || user?.role === 'manager' || user?.role === 'employee') && (
                 <button
                   onClick={handleCreateProject}
                   className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -280,7 +299,9 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-medium text-gray-900">
-                      {user?.role === 'client' ? 'Brochure Project' : `${project.client_name}'s Brochure`}
+                      {user?.role === 'client' ? 'Brochure Project' : 
+                       user?.role === 'manager' ? `${project.client_name}'s Brochure` :
+                       `Brochure for ${project.client_name}`}
                     </h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       project.status === 'draft' ? 'bg-gray-100 text-gray-800' :
@@ -294,7 +315,7 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
                   <p className="text-sm text-gray-600">
                     Created: {new Date(project.created_at).toLocaleDateString()}
                   </p>
-                  {user?.role !== 'client' && (
+                  {user?.role === 'manager' && (
                     <p className="text-sm text-gray-600">
                       Client: {project.client_name}
                     </p>
@@ -378,10 +399,20 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
           {currentProject.status === 'draft' && canEdit && user?.role === 'client' && (
             <button
               onClick={handleSubmitProject}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
             >
-              <Send className="w-4 h-4" />
-              <span>Submit for Design</span>
+              <Save className="w-4 h-4" />
+              <span>Save Project</span>
+            </button>
+          )}
+          
+          {canEdit && (user?.role === 'manager' || user?.role === 'employee') && (
+            <button
+              onClick={handleSubmitProject}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Project</span>
             </button>
           )}
           
