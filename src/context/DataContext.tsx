@@ -22,7 +22,7 @@ interface DataContextType {
   createProject: (project: Omit<Project, 'id' | 'created_at'>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   addCommentTask: (data: Omit<CommentTask, 'id' | 'timestamp'>) => void;
-  addGlobalComment: (data: Omit<GlobalComment, 'id' | 'timestamp'>) => void;
+  addGlobalComment: (data: { project_id: string; content: string; added_by: string; author_role: string }) => void;
   updateCommentTaskStatus: (taskId: string, status: 'open' | 'in-progress' | 'done') => void;
   updateStageApproval: (stageId: string, status: 'approved' | 'rejected', comment?: string) => void;
   uploadFile: (fileData: Omit<File, 'id' | 'timestamp'>) => void;
@@ -568,15 +568,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addGlobalComment = async (data: Omit<GlobalComment, 'id' | 'timestamp'>) => {
+  const addGlobalComment = async (data: { project_id: string; content: string; added_by: string; author_role: string }) => {
     const newGlobalComment: GlobalComment = {
-      ...data,
       id: uuidv4(),
-      timestamp: new Date().toISOString()
+      project_id: data.project_id,
+      content: data.content,
+      added_by: data.added_by,
+      timestamp: new Date().toISOString(),
+      author_role: data.author_role
     };
     setGlobalComments(prev => [...prev, newGlobalComment]);
     if (supabase) {
-      await supabase.from('global_comments').insert(newGlobalComment);
+      const { error } = await supabase
+        .from('global_comments')
+        .insert({
+          project_id: data.project_id,
+          content: data.content,
+          added_by: data.added_by,
+          timestamp: newGlobalComment.timestamp,
+          author_role: data.author_role
+        });
+      if (error) {
+        console.error('Error adding global comment:', error);
+        throw error;
+      }
     } else {
       console.error('Supabase not configured - global comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
     }
