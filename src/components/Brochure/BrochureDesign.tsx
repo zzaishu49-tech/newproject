@@ -32,7 +32,9 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
     createBrochureProject, 
     updateBrochureProject,
     saveBrochurePage,
-    getBrochurePages
+    getBrochurePages,
+    lockBrochurePage,
+    unlockBrochurePage
   } = useData();
 
   const [currentProject, setCurrentProject] = useState<BrochureProject | null>(initialBrochureProject || null);
@@ -81,7 +83,7 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
 
   // Auto-save functionality with debounce
   const debouncedSave = useCallback(
-    debounce((projectId: string, pageNumber: number, content: BrochurePage['content']) => {
+    debounceWithFlush((projectId: string, pageNumber: number, content: BrochurePage['content']) => {
       setIsSaving(true);
       saveBrochurePage({
         project_id: projectId,
@@ -149,9 +151,22 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
 
   const handleSubmitProject = () => {
     if (!currentProject) return;
-    // Just save the project - no status change needed
-    updateBrochureProject(currentProject.id, { updated_at: new Date().toISOString() });
-    setCurrentProject(prev => prev ? { ...prev, updated_at: new Date().toISOString() } : null);
+    
+    // First, flush any pending saves to ensure current page content is saved
+    debouncedSave.flush();
+    
+    // Update project status and timestamp
+    const updates: Partial<BrochureProject> = {
+      updated_at: new Date().toISOString()
+    };
+    
+    // If project is in draft, move it to ready_for_design
+    if (currentProject.status === 'draft') {
+      updates.status = 'ready_for_design';
+    }
+    
+    updateBrochureProject(currentProject.id, updates);
+    setCurrentProject(prev => prev ? { ...prev, ...updates } : null);
   };
 
   const calculateProgress = () => {
@@ -578,14 +593,27 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   );
 }
 
-// Debounce utility function
-function debounce<T extends (...args: any[]) => any>(
+// Enhanced debounce utility function with flush capability
+function debounceWithFlush<T extends (...args: any[]) => any>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): ((...args: Parameters<T>) => void) & { flush: () => void } {
   let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
+  let lastArgs: Parameters<T> | undefined;
+  
+  const debounced = (...args: Parameters<T>) => {
+    lastArgs = args;
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
+  
+  debounced.flush = () => {
+    if (lastArgs) {
+      clearTimeout(timeout);
+      func(...lastArgs);
+      lastArgs = undefined;
+    }
+  };
+  
+  return debounced;
 }
