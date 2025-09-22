@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { useData } from '../../context/DataContext';
 import { BrochurePage } from '../../types';
 import { 
   Upload, 
   Trash2, 
   Image as ImageIcon,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Loader2
 } from 'lucide-react';
 
 interface BrochurePageEditorProps {
@@ -25,8 +27,10 @@ export function BrochurePageEditor({
   onDataChange,
   isEditable = true
 }: BrochurePageEditorProps) {
+  const { uploadBrochureImage } = useData();
   const [localData, setLocalData] = useState<BrochurePage['content']>(pageData);
   const [editorValue, setEditorValue] = useState<string>((pageData.body_content as string) || '');
+  const [uploadingImages, setUploadingImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     setLocalData(pageData);
@@ -53,10 +57,31 @@ export function BrochurePageEditor({
       return;
     }
     
-    // In a real app, this would upload to a server
-    const url = URL.createObjectURL(file);
-    const images = (localData.images || []);
-    handleInputChange('images', [...images, url]);
+    const images = localData.images || [];
+    const imageIndex = images.length;
+    
+    // Add to uploading set
+    setUploadingImages(prev => new Set(prev).add(imageIndex));
+    
+    // Upload to Supabase
+    uploadBrochureImage(file, projectId)
+      .then(url => {
+        handleInputChange('images', [...images, url]);
+        setUploadingImages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(imageIndex);
+          return newSet;
+        });
+      })
+      .catch(error => {
+        console.error('Error uploading image:', error);
+        alert('Failed to upload image. Please try again.');
+        setUploadingImages(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(imageIndex);
+          return newSet;
+        });
+      });
   };
 
   const removeImage = (index: number) => {
@@ -148,18 +173,30 @@ export function BrochurePageEditor({
 
           {/* Upload Area */}
           {isEditable && (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+            <div className={`border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors ${uploadingImages.size > 0 ? 'opacity-50' : ''}`}>
               <label className="cursor-pointer">
-                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 mb-1">Click to upload image</p>
-                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                {uploadingImages.size > 0 ? (
+                  <>
+                    <Loader2 className="w-8 h-8 text-blue-500 mx-auto mb-2 animate-spin" />
+                    <p className="text-blue-600 mb-1">Uploading image...</p>
+                    <p className="text-xs text-blue-500">Please wait</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600 mb-1">Click to upload image</p>
+                    <p className="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                  </>
+                )}
                 <input
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  disabled={uploadingImages.size > 0}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileUpload(file);
+                    e.target.value = ''; // Reset input
                   }}
                 />
               </label>

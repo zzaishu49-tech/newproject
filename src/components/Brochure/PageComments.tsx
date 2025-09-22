@@ -11,7 +11,7 @@ interface PageCommentsProps {
 
 export function PageComments({ pageId, projectId, pageNumber }: PageCommentsProps) {
   const { user } = useAuth();
-  const { addPageComment, getPageComments, markCommentDone, brochurePages } = useData();
+  const { addPageComment, getPageComments, markCommentDone } = useData();
   const [newComment, setNewComment] = useState('');
 
   const comments = getPageComments(pageId);

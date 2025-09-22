@@ -223,6 +223,144 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [downloadHistory, setDownloadHistory] = useState<DownloadHistory[]>([]);
 
+  // Load brochure projects from Supabase
+  const loadBrochureProjects = async () => {
+    if (!supabase) return;
+    
+    try {
+      console.log('Loading brochure projects from Supabase...');
+      const { data, error } = await supabase
+        .from('brochure_projects')
+        .select(`
+          *,
+          client:profiles!brochure_projects_client_id_fkey(full_name)
+        `);
+      
+      if (!error && data) {
+        console.log('Brochure projects loaded successfully:', data.length);
+        const mappedProjects: BrochureProject[] = data.map((p: any) => ({
+          id: p.id,
+          client_id: p.client_id,
+          client_name: p.client?.full_name || 'Unknown Client',
+          status: p.status,
+          created_at: p.created_at,
+          updated_at: p.updated_at,
+          pages: []
+        }));
+        setBrochureProjects(mappedProjects);
+      } else if (error) {
+        console.error('Supabase error loading brochure projects:', error);
+      }
+    } catch (error) {
+      console.error('Error loading brochure projects:', error);
+    }
+  };
+
+  // Load brochure pages from Supabase
+  const loadBrochurePages = async () => {
+    if (!supabase) return;
+    
+    try {
+      console.log('Loading brochure pages from Supabase...');
+      const { data, error } = await supabase
+        .from('brochure_pages')
+        .select(`
+          *,
+          locked_by_profile:profiles!brochure_pages_locked_by_fkey(full_name)
+        `);
+      
+      if (!error && data) {
+        console.log('Brochure pages loaded successfully:', data.length);
+        const mappedPages: BrochurePage[] = data.map((p: any) => ({
+          id: p.id,
+          project_id: p.project_id,
+          page_number: p.page_number,
+          approval_status: p.approval_status,
+          is_locked: p.is_locked,
+          locked_by: p.locked_by,
+          locked_by_name: p.locked_by_profile?.full_name || p.locked_by_name,
+          locked_at: p.locked_at,
+          content: p.content || {},
+          created_at: p.created_at,
+          updated_at: p.updated_at
+        }));
+        setBrochurePages(mappedPages);
+      } else if (error) {
+        console.error('Supabase error loading brochure pages:', error);
+      }
+    } catch (error) {
+      console.error('Error loading brochure pages:', error);
+    }
+  };
+
+  // Load page comments from Supabase
+  const loadPageComments = async () => {
+    if (!supabase) return;
+    
+    try {
+      console.log('Loading page comments from Supabase...');
+      const { data, error } = await supabase
+        .from('page_comments')
+        .select(`
+          *,
+          author:profiles!page_comments_added_by_fkey(full_name)
+        `);
+      
+      if (!error && data) {
+        console.log('Page comments loaded successfully:', data.length);
+        const mappedComments: PageComment[] = data.map((c: any) => ({
+          id: c.id,
+          page_id: c.page_id,
+          text: c.text,
+          added_by: c.added_by,
+          author_name: c.author?.full_name || 'Unknown User',
+          author_role: c.author_role,
+          timestamp: c.timestamp,
+          marked_done: c.marked_done,
+          action_type: c.action_type
+        }));
+        setPageComments(mappedComments);
+      } else if (error) {
+        console.error('Supabase error loading page comments:', error);
+      }
+    } catch (error) {
+      console.error('Error loading page comments:', error);
+    }
+  };
+
+  // Upload image to Supabase Storage
+  const uploadBrochureImage = async (file: globalThis.File, projectId: string): Promise<string> => {
+    if (!supabase) {
+      throw new Error('Supabase not configured');
+    }
+
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${projectId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('brochure-images')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('brochure-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading brochure image:', error);
+      throw error;
+    }
+  };
+
   const loadGlobalComments = async () => {
     if (!supabase) return;
     
@@ -371,6 +509,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
     loadProjects();
     loadTasks();
     loadGlobalComments();
+    loadBrochureProjects();
+    loadBrochurePages();
+    loadPageComments();
     
     // Set up real-time subscriptions
     if (supabase) {
@@ -402,11 +543,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
         .subscribe();
 
+      const brochureProjectsSubscription = supabase
+        .channel('brochure_projects')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_projects' }, () => {
+          loadBrochureProjects();
+        })
+        .subscribe();
+
+      const brochurePagesSubscription = supabase
+        .channel('brochure_pages')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_pages' }, () => {
+          loadBrochurePages();
+        })
+        .subscribe();
+
+      const pageCommentsSubscription = supabase
+        .channel('page_comments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'page_comments' }, () => {
+          loadPageComments();
+        })
+        .subscribe();
+
       return () => {
         supabase.removeChannel(projectsSubscription);
         supabase.removeChannel(profilesSubscription);
         supabase.removeChannel(tasksSubscription);
         supabase.removeChannel(globalCommentsSubscription);
+        supabase.removeChannel(brochureProjectsSubscription);
+        supabase.removeChannel(brochurePagesSubscription);
+        supabase.removeChannel(pageCommentsSubscription);
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -886,67 +1051,127 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const createBrochureProject = (clientId: string, clientName: string): string => {
-    const newProject: BrochureProject = {
-      id: uuidv4(),
-      client_id: clientId,
-      client_name: clientName,
-      status: 'draft',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      pages: []
-    };
-    setBrochureProjects(prev => [...prev, newProject]);
+    const projectId = uuidv4();
+    
     if (supabase) {
-      supabase.from('brochure_projects').insert(newProject);
+      supabase.from('brochure_projects').insert({
+        id: projectId,
+        client_id: clientId,
+        status: 'draft'
+      }).then(({ error }) => {
+        if (error) {
+          console.error('Error creating brochure project:', error);
+        } else {
+          loadBrochureProjects(); // Reload to get updated data
+        }
+      });
     } else {
-      console.error('Supabase not configured - brochure project not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      const newProject: BrochureProject = {
+        id: projectId,
+        client_id: clientId,
+        client_name: clientName,
+        status: 'draft',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        pages: []
+      };
+      setBrochureProjects(prev => [...prev, newProject]);
     }
-    return newProject.id;
+    
+    return projectId;
   };
 
   const updateBrochureProject = async (id: string, updates: Partial<BrochureProject>) => {
-    setBrochureProjects(prev => prev.map(project => 
-      project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project
-    ));
     if (supabase) {
-      await supabase.from('brochure_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+      const { error } = await supabase
+        .from('brochure_projects')
+        .update({ 
+          status: updates.status,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating brochure project:', error);
+      } else {
+        loadBrochureProjects(); // Reload to get updated data
+      }
     } else {
-      console.error('Supabase not configured - brochure project not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      setBrochureProjects(prev => prev.map(project => 
+        project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project
+      ));
     }
   };
 
   const saveBrochurePage = async (pageData: Omit<BrochurePage, 'id' | 'created_at' | 'updated_at'>) => {
-    const existingPageIndex = brochurePages.findIndex(
-      page => page.project_id === pageData.project_id && page.page_number === pageData.page_number
-    );
+    if (supabase) {
+      // Check if page exists
+      const { data: existingPage } = await supabase
+        .from('brochure_pages')
+        .select('id')
+        .eq('project_id', pageData.project_id)
+        .eq('page_number', pageData.page_number)
+        .single();
 
-    if (existingPageIndex >= 0) {
-      // Update existing page
-      setBrochurePages(prev => prev.map((page, index) => 
-        index === existingPageIndex 
-          ? { ...page, content: pageData.content, updated_at: new Date().toISOString() }
-          : page
-      ));
-      if (supabase) {
-        await supabase.from('brochure_pages').update({ content: pageData.content, updated_at: new Date().toISOString() }).eq('id', brochurePages[existingPageIndex].id);
+      if (existingPage) {
+        // Update existing page
+        const { error } = await supabase
+          .from('brochure_pages')
+          .update({ 
+            content: pageData.content,
+            approval_status: pageData.approval_status || 'pending',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', existingPage.id);
+        
+        if (error) {
+          console.error('Error updating brochure page:', error);
+        }
       } else {
-        console.error('Supabase not configured - brochure page not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+        // Create new page
+        const { error } = await supabase
+          .from('brochure_pages')
+          .insert({
+            project_id: pageData.project_id,
+            page_number: pageData.page_number,
+            content: pageData.content,
+            approval_status: pageData.approval_status || 'pending',
+            is_locked: pageData.is_locked || false
+          });
+        
+        if (error) {
+          console.error('Error creating brochure page:', error);
+        }
       }
+      
+      // Reload pages to get updated data
+      loadBrochurePages();
     } else {
-      // Create new page
-      const newPage: BrochurePage = {
-        ...pageData,
-        approval_status: pageData.approval_status ?? 'pending',
-        is_locked: pageData.is_locked ?? false,
-        id: uuidv4(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      setBrochurePages(prev => [...prev, newPage]);
-      if (supabase) {
-        await supabase.from('brochure_pages').insert(newPage);
+      // Fallback to local state
+      const existingPageIndex = brochurePages.findIndex(
+        page => page.project_id === pageData.project_id && page.page_number === pageData.page_number
+      );
+
+      if (existingPageIndex >= 0) {
+        // Update existing page
+        setBrochurePages(prev => prev.map((page, index) => 
+          index === existingPageIndex 
+            ? { ...page, content: pageData.content, updated_at: new Date().toISOString() }
+            : page
+        ));
       } else {
-        console.error('Supabase not configured - brochure page not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+        // Create new page
+        const newPage: BrochurePage = {
+          ...pageData,
+          approval_status: pageData.approval_status ?? 'pending',
+          is_locked: pageData.is_locked ?? false,
+          id: uuidv4(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        setBrochurePages(prev => [...prev, newPage]);
       }
     }
   };
@@ -958,16 +1183,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const addPageComment = async (commentData: Omit<PageComment, 'id' | 'timestamp'>) => {
-    const newComment: PageComment = {
-      ...commentData,
-      id: uuidv4(),
-      timestamp: new Date().toISOString()
-    };
-    setPageComments(prev => [...prev, newComment]);
     if (supabase) {
-      await supabase.from('page_comments').insert(newComment);
+      const { error } = await supabase
+        .from('page_comments')
+        .insert({
+          page_id: commentData.page_id,
+          text: commentData.text,
+          added_by: commentData.added_by,
+          author_role: commentData.author_role,
+          marked_done: commentData.marked_done || false,
+          action_type: commentData.action_type
+        });
+      
+      if (error) {
+        console.error('Error adding page comment:', error);
+      } else {
+        loadPageComments(); // Reload to get updated data
+      }
     } else {
-      console.error('Supabase not configured - page comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      const newComment: PageComment = {
+        ...commentData,
+        id: uuidv4(),
+        timestamp: new Date().toISOString()
+      };
+      setPageComments(prev => [...prev, newComment]);
     }
   };
 
@@ -978,13 +1218,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const markCommentDone = async (commentId: string) => {
-    setPageComments(prev => prev.map(comment => 
-      comment.id === commentId ? { ...comment, marked_done: true } : comment
-    ));
     if (supabase) {
-      await supabase.from('page_comments').update({ marked_done: true }).eq('id', commentId);
+      const { error } = await supabase
+        .from('page_comments')
+        .update({ marked_done: true })
+        .eq('id', commentId);
+      
+      if (error) {
+        console.error('Error marking comment done:', error);
+      } else {
+        loadPageComments(); // Reload to get updated data
+      }
     } else {
-      console.error('Supabase not configured - comment status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      setPageComments(prev => prev.map(comment => 
+        comment.id === commentId ? { ...comment, marked_done: true } : comment
+      ));
     }
   };
 
@@ -1055,42 +1304,72 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const lockBrochurePage = async (pageId: string) => {
     if (!user) return;
     
-    setBrochurePages(prev => prev.map(page => 
-      page.id === pageId 
-        ? { 
-            ...page, 
-            is_locked: true,
-            locked_by: user.id,
-            locked_by_name: user.name,
-            locked_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        : page
-    ));
     if (supabase) {
-      await supabase.from('brochure_pages').update({ is_locked: true, locked_by: user?.id, locked_by_name: user?.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', pageId);
+      const { error } = await supabase
+        .from('brochure_pages')
+        .update({ 
+          is_locked: true, 
+          locked_by: user.id, 
+          locked_by_name: user.name, 
+          locked_at: new Date().toISOString(),
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', pageId);
+      
+      if (error) {
+        console.error('Error locking page:', error);
+      } else {
+        loadBrochurePages(); // Reload to get updated data
+      }
     } else {
-      console.error('Supabase not configured - page lock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      setBrochurePages(prev => prev.map(page => 
+        page.id === pageId 
+          ? { 
+              ...page, 
+              is_locked: true,
+              locked_by: user.id,
+              locked_by_name: user.name,
+              locked_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+          : page
+      ));
     }
   };
 
   const unlockBrochurePage = async (pageId: string) => {
-    setBrochurePages(prev => prev.map(page => 
-      page.id === pageId 
-        ? { 
-            ...page, 
-            is_locked: false,
-            locked_by: undefined,
-            locked_by_name: undefined,
-            locked_at: undefined,
-            updated_at: new Date().toISOString()
-          }
-        : page
-    ));
     if (supabase) {
-      await supabase.from('brochure_pages').update({ is_locked: false, locked_by: null, locked_by_name: null, locked_at: null, updated_at: new Date().toISOString() }).eq('id', pageId);
+      const { error } = await supabase
+        .from('brochure_pages')
+        .update({ 
+          is_locked: false, 
+          locked_by: null, 
+          locked_by_name: null, 
+          locked_at: null,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', pageId);
+      
+      if (error) {
+        console.error('Error unlocking page:', error);
+      } else {
+        loadBrochurePages(); // Reload to get updated data
+      }
     } else {
-      console.error('Supabase not configured - page unlock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      // Fallback to local state
+      setBrochurePages(prev => prev.map(page => 
+        page.id === pageId 
+          ? { 
+              ...page, 
+              is_locked: false,
+              locked_by: undefined,
+              locked_by_name: undefined,
+              locked_at: undefined,
+              updated_at: new Date().toISOString()
+            }
+          : page
+      ));
     }
   };
 
@@ -1143,7 +1422,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unlockBrochurePage,
       createUserAccount,
       refreshUsers,
-      loadProjects
+      loadProjects,
+      uploadBrochureImage
     }}>
       {children}
     </DataContext.Provider>
