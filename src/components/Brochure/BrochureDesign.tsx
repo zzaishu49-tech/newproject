@@ -43,14 +43,16 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   const [pageData, setPageData] = useState<BrochurePage['content']>({});
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [showFeedbackReport, setShowFeedbackReport] = useState(false);
+  const [showSaveSuccessMessage, setShowSaveSuccessMessage] = useState(false);
 
   // Check if current user can edit this project
   const canEdit = useMemo(() => {
     if (!user || !currentProject) return false;
-    // All roles can edit brochure projects
+    // Managers can edit all brochure projects
     if (user.role === 'manager') return true;
+    // Clients can edit their own brochure projects
     if (user.role === 'client' && currentProject.client_id === user.id) return true;
+    // Employees can edit brochure projects for clients they're assigned to work with
     if (user.role === 'employee') {
       const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
       return relatedProject && relatedProject.assigned_employees.includes(user.id);
@@ -66,16 +68,16 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
     }
     
     if (user?.role === 'manager') {
-      // Manager can see all brochure projects
+      // Managers can access all brochure projects
       return brochureProjects;
     } else if (user?.role === 'employee') {
-      // Employee can see projects they're assigned to
+      // Employees can access brochure projects for clients they work with
       const assignedProjects = projects
         .filter(p => p.assigned_employees.includes(user.id))
         .map(p => p.client_id);
       return brochureProjects.filter(bp => assignedProjects.includes(bp.client_id));
     } else if (user?.role === 'client') {
-      // Client can only see their own projects
+      // Clients can only access their own brochure projects
       return brochureProjects.filter(project => project.client_id === user.id);
     }
     return [];
@@ -85,13 +87,25 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   const debouncedSave = useCallback(
     debounceWithFlush((projectId: string, pageNumber: number, content: BrochurePage['content']) => {
       setIsSaving(true);
-      saveBrochurePage({
+      const savePromise = saveBrochurePage({
         project_id: projectId,
         page_number: pageNumber,
         content
       });
-      setLastSaved(new Date());
-      setIsSaving(false);
+      
+      // Handle the promise to show success message
+      Promise.resolve(savePromise)
+        .then(() => {
+          setLastSaved(new Date());
+          setIsSaving(false);
+          setShowSaveSuccessMessage(true);
+          // Hide success message after 3 seconds
+          setTimeout(() => setShowSaveSuccessMessage(false), 3000);
+        })
+        .catch((error) => {
+          console.error('Error saving page:', error);
+          setIsSaving(false);
+        });
     }, 2000),
     [saveBrochurePage]
   );
@@ -169,6 +183,10 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
     setCurrentProject(prev => prev ? { ...prev, ...updates } : null);
   };
 
+  const handleManualSave = () => {
+    // Flush any pending saves to immediately save current content
+    debouncedSave.flush();
+  };
   const calculateProgress = () => {
     if (!currentProject) return 0;
     const pages = getBrochurePages(currentProject.id);
@@ -369,8 +387,17 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
             </button>
             {canEdit && (
               <button
-                onClick={addNewPage}
+                onClick={handleManualSave}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Now</span>
+              </button>
+            )}
+            {canEdit && (
+              <button
+                onClick={addNewPage}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Page</span>
@@ -405,6 +432,12 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
               <span>{currentProject.status.replace('_', ' ')}</span>
             </span>
             {isSaving && <span className="text-sm text-gray-500">Saving...</span>}
+            {showSaveSuccessMessage && (
+              <span className="text-sm text-green-600 font-medium flex items-center space-x-1">
+                <CheckCircle className="w-4 h-4" />
+                <span>Saved Successfully</span>
+              </span>
+            )}
             {lastSaved && !isSaving && (
               <span className="text-sm text-gray-500">
                 Last saved: {lastSaved.toLocaleTimeString()}
@@ -415,30 +448,20 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
           {currentProject.status === 'draft' && canEdit && user?.role === 'client' && (
             <button
               onClick={handleSubmitProject}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
             >
-              <Save className="w-4 h-4" />
-              <span>Save Project</span>
+              <Send className="w-4 h-4" />
+              <span>Submit for Review</span>
             </button>
           )}
           
           {canEdit && (user?.role === 'manager' || user?.role === 'employee') && (
             <button
               onClick={handleSubmitProject}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
             >
-              <Save className="w-4 h-4" />
-              <span>Save Project</span>
-            </button>
-          )}
-          
-          {currentProject.status !== 'draft' && (
-            <button
-              onClick={() => setShowFeedbackReport(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>View Feedback Report</span>
+              <Send className="w-4 h-4" />
+              <span>Update Project Status</span>
             </button>
           )}
         </div>
@@ -582,14 +605,6 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
           />
         </div>
       </div>
-      
-      {/* Feedback Report Modal */}
-      {showFeedbackReport && currentProject && (
-        <ClientFeedbackReport
-          project={currentProject}
-          onClose={() => setShowFeedbackReport(false)}
-        />
-      )}
     </div>
   );
 }

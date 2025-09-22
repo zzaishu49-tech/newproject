@@ -1128,6 +1128,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error('Error updating brochure page:', error);
+          throw error;
         }
       } else {
         // Create new page
@@ -1143,6 +1144,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error('Error creating brochure page:', error);
+          throw error;
         }
       }
       
@@ -1173,6 +1175,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         };
         setBrochurePages(prev => [...prev, newPage]);
       }
+      // Return resolved promise for consistency
+      return Promise.resolve();
     }
   };
 
