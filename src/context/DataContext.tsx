@@ -3,11 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Project, Stage, CommentTask, GlobalComment, File, Task, Meeting, BrochureProject, BrochurePage, PageComment, Lead, STAGE_NAMES, DownloadHistory, User } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from './AuthContext';
-
-// Load environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://vyanqukylmlysdtrgpip.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''; // Ensure this is set in .env
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase as externalSupabase } from '../superBaseClient';
 
 interface DataContextType {
   projects: Project[];
@@ -61,6 +57,9 @@ interface DataContextType {
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
+
+// Supabase client
+let supabase: SupabaseClient | null = externalSupabase;
 
 // Enhanced mock data with Indian names
 const mockProjects: Project[] = [
@@ -226,44 +225,37 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createUserAccount = async (params: { email: string; password: string; full_name: string; role: 'employee' | 'client' }) => {
     if (!supabase) {
-      alert('Supabase client not initialized. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+      alert('User creation requires Supabase to be configured.');
       return null;
     }
     const { email, password, full_name, role } = params;
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error || !data.user) {
-      alert(error?.message || 'Failed to create user');
+    const signup = await supabase.auth.signUp({ email, password });
+    if (signup.error || !signup.data.user) {
+      alert(signup.error?.message || 'Failed to create user');
       return null;
     }
-    const userId = data.user.id;
-    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: userId, full_name, role, email }, { onConflict: 'id' });
+    const userId = signup.data.user.id;
+    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: userId, full_name, role, email });
     if (upsertErr) {
-      console.error('Error upserting profile:', upsertErr);
       alert(upsertErr.message);
       return null;
     }
     setUsers(prev => [...prev, { id: userId, name: full_name, email, role } as User]);
-    await refreshUsers();
     return { id: userId };
   };
 
   const refreshUsers = async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('profiles').select('id, full_name, role, email');
-    if (error) {
-      console.error('Error refreshing users:', error);
-    } else if (data) {
-      const mapped: User[] = data.map(p => ({ id: p.id, name: p.full_name || p.email || 'User', email: p.email || '', role: p.role }));
+    if (!error && data) {
+      const mapped: User[] = (data as any[]).map(p => ({ id: p.id, name: p.full_name || p.email || 'User', email: p.email || '', role: p.role }));
       setUsers(mapped);
     }
   };
 
   const loadProjects = async () => {
-    if (!supabase) {
-      console.error('Supabase not initialized');
-      setProjects(mockProjects);
-      return;
-    }
+    if (!supabase) return;
+    
     try {
       console.log('Loading projects from Supabase...');
       const { data, error } = await supabase
@@ -272,10 +264,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           *,
           client:profiles!projects_client_id_fkey(full_name)
         `);
-      if (error) {
-        console.error('Supabase error loading projects:', error);
-        setProjects(mockProjects);
-      } else if (data) {
+      
+      if (!error && data) {
         console.log('Projects loaded successfully:', data.length);
         const mappedProjects: Project[] = data.map((p: any) => ({
           id: p.id,
@@ -291,25 +281,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
           priority: p.priority
         }));
         setProjects(mappedProjects);
+      } else if (error) {
+        console.error('Supabase error loading projects:', error);
+        // Fall back to mock data if Supabase fails
+        console.log('Falling back to mock data');
+        setProjects(mockProjects);
       }
     } catch (error) {
       console.error('Error loading projects:', error);
+      // Fall back to mock data if network request fails
+      console.log('Network error, falling back to mock data');
       setProjects(mockProjects);
     }
   };
 
   const loadTasks = async () => {
-    if (!supabase) {
-      console.error('Supabase not initialized');
-      return;
-    }
+    if (!supabase) return;
+    
     try {
       console.log('Loading tasks from Supabase...');
-      const { data, error } = await supabase.from('tasks').select('*');
-      if (error) {
-        console.error('Supabase error loading tasks:', error);
-      } else if (data) {
-        console.log('Raw tasks data from Supabase:', data);
+      
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*');
+      
+      if (!error && data) {
+      console.log('Raw tasks data from Supabase:', data);
+      
         const mappedTasks: Task[] = data.map((t: any) => ({
           id: t.id,
           project_id: t.project_id,
@@ -323,45 +321,60 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: t.created_at,
           updated_at: t.updated_at
         }));
+        
         console.log('Mapped tasks:', mappedTasks);
         setTasks(mappedTasks);
+      } else if (error) {
+        console.error('Supabase error loading tasks:', error);
+        // Keep existing tasks or set empty array
+        console.log('Error loading tasks, keeping existing state');
       }
     } catch (error) {
       console.error('Error loading tasks:', error);
+      console.log('Network error loading tasks, keeping existing state');
     }
   };
-
   useEffect(() => {
     refreshUsers();
     loadProjects();
     loadTasks();
-    if (!supabase) return;
+    
+    // Set up real-time subscriptions
+    if (supabase) {
+      const projectsSubscription = supabase
+        .channel('projects')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+          loadProjects();
+        })
+        .subscribe();
 
-    const projectsSubscription = supabase
-      .channel('projects')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadProjects())
-      .subscribe();
+      const profilesSubscription = supabase
+        .channel('profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          refreshUsers();
+        })
+        .subscribe();
 
-    const profilesSubscription = supabase
-      .channel('profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => refreshUsers())
-      .subscribe();
-
-    const tasksSubscription = supabase
-      .channel('tasks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadTasks())
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(projectsSubscription);
-      supabase.removeChannel(profilesSubscription);
-      supabase.removeChannel(tasksSubscription);
-    };
+      const tasksSubscription = supabase
+        .channel('tasks')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+          loadTasks();
+        })
+        .subscribe();
+      return () => {
+        supabase.removeChannel(projectsSubscription);
+        supabase.removeChannel(profilesSubscription);
+        supabase.removeChannel(tasksSubscription);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-generate stages for new projects
   useEffect(() => {
     const existingProjectIds = new Set(stages.map(s => s.project_id));
     const newProjects = projects.filter(p => !existingProjectIds.has(p.id));
+    
     if (newProjects.length > 0) {
       const newStages: Stage[] = [];
       newProjects.forEach(project => {
@@ -386,9 +399,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const downloadFile = (fileId: string) => {
     const file = files.find(f => f.id === fileId);
     if (!file || !user) return;
+
+    // Update download count and last downloaded info
     setFiles(prev => prev.map(f => 
-      f.id === fileId ? { ...f, download_count: f.download_count + 1, last_downloaded: new Date().toISOString(), last_downloaded_by: user.id } : f
+      f.id === fileId 
+        ? { 
+            ...f, 
+            download_count: f.download_count + 1,
+            last_downloaded: new Date().toISOString(),
+            last_downloaded_by: user.id
+          }
+        : f
     ));
+
+    // Add to download history
     const historyEntry: DownloadHistory = {
       id: uuidv4(),
       file_id: fileId,
@@ -399,6 +423,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       file_size: file.size
     };
     setDownloadHistory(prev => [...prev, historyEntry]);
+
+    // Trigger actual download
     const link = document.createElement('a');
     link.href = file.file_url;
     link.download = file.filename;
@@ -407,8 +433,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const downloadMultipleFiles = (fileIds: string[]) => {
     if (!user) return;
+
     const filesToDownload = files.filter(f => fileIds.includes(f.id));
-    filesToDownload.forEach(file => setTimeout(() => downloadFile(file.id), 100));
+    
+    // In a real implementation, this would create a zip file on the server
+    // For now, we'll download files individually
+    filesToDownload.forEach(file => {
+      setTimeout(() => downloadFile(file.id), 100);
+    });
   };
 
   const getDownloadHistory = (): DownloadHistory[] => {
@@ -416,6 +448,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .filter(entry => {
         const file = files.find(f => f.id === entry.file_id);
         if (!file) return false;
+        
+        // Filter based on user role and project access
         if (user?.role === 'manager') return true;
         if (user?.role === 'employee') {
           const project = projects.find(p => p.id === file.project_id);
@@ -427,91 +461,117 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateFileMetadata = (fileId: string, metadata: Partial<File>) => {
-    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...metadata } : f));
+    setFiles(prev => prev.map(f => 
+      f.id === fileId ? { ...f, ...metadata } : f
+    ));
   };
 
   const createProject = async (projectData: Omit<Project, 'id' | 'created_at'>) => {
-    if (!supabase) {
-      const newProject: Project = { ...projectData, id: uuidv4(), created_at: new Date().toISOString() };
-      setProjects(prev => [...prev, newProject]);
-      return;
-    }
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .insert({ ...projectData })
-        .select()
-        .single();
-      if (error) throw error;
-      if (data) {
-        const stageInserts = STAGE_NAMES.map((stageName, index) => ({
-          project_id: data.id,
-          name: stageName,
-          notes: '',
-          progress_percentage: 0,
-          approval_status: 'pending',
-          order: index
-        }));
-        await supabase.from('stages').insert(stageInserts);
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            title: projectData.title,
+            description: projectData.description,
+            client_id: projectData.client_id,
+            deadline: projectData.deadline,
+            progress_percentage: projectData.progress_percentage,
+            assigned_employees: projectData.assigned_employees,
+            status: projectData.status,
+            priority: projectData.priority
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating project:', error);
+          throw error;
+        }
+
+        // Create default stages for the new project
+        if (data) {
+          const stageInserts = STAGE_NAMES.map((stageName, index) => ({
+            project_id: data.id,
+            name: stageName,
+            notes: '',
+            progress_percentage: 0,
+            approval_status: 'pending',
+            order: index
+          }));
+
+          await supabase.from('stages').insert(stageInserts);
+        }
+
+        // Refresh projects to get the updated list
         await loadProjects();
+      } catch (error) {
+        console.error('Error creating project:', error);
+        throw error;
       }
-    } catch (error) {
-      console.error('Error creating project:', error);
-      throw error;
+    } else {
+      // Fallback to local state if Supabase is not available
+      const newProject: Project = {
+        ...projectData,
+        id: uuidv4(),
+        created_at: new Date().toISOString()
+      };
+      setProjects(prev => [...prev, newProject]);
     }
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
-    if (!supabase) {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .update({
+            title: updates.title,
+            description: updates.description,
+            client_id: updates.client_id,
+            deadline: updates.deadline,
+            progress_percentage: updates.progress_percentage,
+            assigned_employees: updates.assigned_employees,
+            status: updates.status,
+            priority: updates.priority
+          })
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error updating project:', error);
+          throw error;
+        }
+
+        // Refresh projects to get the updated list
+        await loadProjects();
+      } catch (error) {
+        console.error('Error updating project:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
       setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-      return;
-    }
-    try {
-      const { error } = await supabase.from('projects').update(updates).eq('id', id);
-      if (error) throw error;
-      await loadProjects();
-    } catch (error) {
-      console.error('Error updating project:', error);
-      throw error;
     }
   };
 
   const addCommentTask = async (data: Omit<CommentTask, 'id' | 'timestamp'>) => {
-    const newCommentTask: CommentTask = { ...data, id: uuidv4(), timestamp: new Date().toISOString() };
+    const newCommentTask: CommentTask = {
+      ...data,
+      id: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
     setCommentTasks(prev => [...prev, newCommentTask]);
-    if (supabase) await supabase.from('comment_tasks').insert(newCommentTask).catch(console.error);
+    if (supabase) {
+      await supabase.from('comment_tasks').insert(newCommentTask);
+    } else {
+      console.error('Supabase not configured - comment task not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const addGlobalComment = async (data: { project_id: string; text: string; added_by: string; author_role: string }) => {
     if (!data.text || data.text.trim() === '') {
-      console.error('Comment text cannot be empty:', data);
+      console.error('Comment text cannot be empty');
       throw new Error('Comment text is required');
-    }
-    console.log('Adding global comment with data:', data);
-    if (!user || !user.id) {
-      console.error('No authenticated user found');
-      throw new Error('User authentication required');
-    }
-    const project = projects.find(p => p.id === data.project_id);
-    if (!project) {
-      console.error('Project not found:', data.project_id);
-      throw new Error('Invalid project ID');
-    }
-    if (user.role !== 'manager' && user.id !== project.client_id && !project.assigned_employees.includes(user.id)) {
-      console.error('User lacks permission for project:', { userId: user.id, projectId: data.project_id });
-      throw new Error('Permission denied');
-    }
-
-    // Validate or create profile for added_by
-    const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('id', data.added_by).single();
-    if (profileError || !profile) {
-      console.warn('Profile not found for added_by, creating minimal profile:', data.added_by);
-      const { error: createError } = await supabase.from('profiles').insert({ id: data.added_by, full_name: 'Unknown User', role: 'unknown' }, { onConflict: 'id' });
-      if (createError) {
-        console.error('Failed to create profile:', createError);
-        throw new Error('Failed to create missing user profile');
-      }
-      await refreshUsers(); // Sync local state
     }
 
     const newGlobalComment: GlobalComment = {
@@ -524,48 +584,76 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
     setGlobalComments(prev => [...prev, newGlobalComment]);
     if (supabase) {
-      const { error } = await supabase.from('global_comments').insert({
-        project_id: data.project_id,
-        text: data.text,
-        added_by: data.added_by,
-        timestamp: newGlobalComment.timestamp,
-        author_role: data.author_role
-      });
+      const { error } = await supabase
+        .from('global_comments')
+        .insert({
+          project_id: data.project_id,
+          text: data.text,
+          added_by: data.added_by,
+          timestamp: newGlobalComment.timestamp,
+          author_role: data.author_role
+        });
       if (error) {
         console.error('Error adding global comment:', error);
         throw error;
       }
+    } else {
+      console.error('Supabase not configured - global comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
     }
   };
 
   const updateCommentTaskStatus = async (taskId: string, status: 'open' | 'in-progress' | 'done') => {
-    setCommentTasks(prev => prev.map(task => task.id === taskId ? { ...task, status } : task));
-    if (supabase) await supabase.from('comment_tasks').update({ status }).eq('id', taskId).catch(console.error);
+    setCommentTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, status } : task
+    ));
+    if (supabase) {
+      await supabase.from('comment_tasks').update({ status }).eq('id', taskId);
+    } else {
+      console.error('Supabase not configured - comment task status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateStageApproval = async (stageId: string, status: 'approved' | 'rejected', comment?: string) => {
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, approval_status: status } : s));
-    if (supabase) await supabase.from('stages').update({ approval_status: status }).eq('id', stageId).catch(console.error);
+    setStages(prev => prev.map(s => 
+      s.id === stageId ? { ...s, approval_status: status } : s
+    ));
+    if (supabase) {
+      await supabase.from('stages').update({ approval_status: status }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage approval not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
+    
     if (comment) {
       const stage = stages.find(s => s.id === stageId);
-      if (stage) await addCommentTask({
-        stage_id: stageId,
-        project_id: stage.project_id,
-        text: comment,
-        added_by: 'client',
-        author_name: 'Client',
-        author_role: 'client',
-        status: 'open'
-      });
+      if (stage) {
+        await addCommentTask({
+          stage_id: stageId,
+          project_id: stage.project_id,
+          text: comment,
+          added_by: 'client',
+          author_name: 'Client',
+          author_role: 'client',
+          status: 'open'
+        });
+      }
     }
   };
 
   const uploadFile = async (fileData: Omit<File, 'id' | 'timestamp'>) => {
-    const newFile: File = { ...fileData, id: uuidv4(), timestamp: new Date().toISOString() };
+    const newFile: File = {
+      ...fileData,
+      id: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
     setFiles(prev => [...prev, newFile]);
-    if (supabase) await supabase.from('files').insert(newFile).catch(console.error);
+    if (supabase) {
+      await supabase.from('files').insert(newFile);
+    } else {
+      console.error('Supabase not configured - file not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
+  // Fix for FileManager component - handle File object upload
   const uploadFileFromInput = (stageId: string, file: globalThis.File, uploaderName: string) => {
     const fileType = file.name.split('.').pop()?.toLowerCase() || 'unknown';
     const newFile: File = {
@@ -589,83 +677,160 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateStageProgress = async (stageId: string, progress: number) => {
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, progress_percentage: progress } : s));
-    if (supabase) await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId).catch(console.error);
+    setStages(prev => prev.map(s => 
+      s.id === stageId ? { ...s, progress_percentage: progress } : s
+    ));
+    if (supabase) {
+      await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage progress not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const scheduleMeeting = async (meetingData: Omit<Meeting, 'id'>) => {
-    const newMeeting: Meeting = { ...meetingData, id: uuidv4() };
+    const newMeeting: Meeting = {
+      ...meetingData,
+      id: uuidv4()
+    };
     setMeetings(prev => [...prev, newMeeting]);
-    if (supabase) await supabase.from('meetings').insert(newMeeting).catch(console.error);
+    if (supabase) {
+      await supabase.from('meetings').insert(newMeeting);
+    } else {
+      console.error('Supabase not configured - meeting not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
-    if (!supabase) {
-      const newTask: Task = { ...taskData, id: uuidv4(), created_at: new Date().toISOString(), priority: taskData.priority || 'medium' };
-      setTasks(prev => [...prev, newTask]);
-      return;
-    }
-    try {
-      const taskToInsert = {
-        project_id: taskData.project_id,
-        title: taskData.title,
-        description: taskData.description,
-        assigned_to: taskData.assigned_to,
-        status: taskData.status || 'open',
-        priority: taskData.priority || 'medium',
-        deadline: taskData.deadline || null
+    if (supabase) {
+      try {
+        const taskToInsert = {
+          project_id: taskData.project_id,
+          title: taskData.title,
+          description: taskData.description,
+          assigned_to: taskData.assigned_to,
+          status: taskData.status || 'open',
+          priority: taskData.priority || 'medium',
+          deadline: taskData.deadline || null
+        };
+
+        console.log('Creating task with data:', taskToInsert);
+
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert(taskToInsert)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Error creating task:', error);
+          console.error('Error details:', error.message, error.details, error.hint);
+          throw error;
+        }
+
+        console.log('Task created successfully:', data);
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error creating task:', error);
+        // Re-throw with more specific error message
+        throw new Error(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      const newTask: Task = {
+        ...taskData,
+        id: uuidv4(),
+        created_at: new Date().toISOString(),
+        priority: taskData.priority || 'medium'
       };
-      const { data, error } = await supabase.from('tasks').insert(taskToInsert).select().single();
-      if (error) throw error;
-      await loadTasks();
-    } catch (error) {
-      console.error('Error creating task:', error);
-      throw new Error(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTasks(prev => [...prev, newTask]);
     }
   };
 
   const updateTaskStatus = async (taskId: string, status: 'open' | 'in-progress' | 'done') => {
-    if (!supabase) {
-      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, status } : task));
-      return;
-    }
-    try {
-      const { error } = await supabase.from('tasks').update({ status }).eq('id', taskId);
-      if (error) throw error;
-      await loadTasks();
-    } catch (error) {
-      console.error('Error updating task status:', error);
-      throw error;
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status })
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error updating task status:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error updating task status:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, status } : task
+      ));
     }
   };
 
   const updateTask = async (taskId: string, updates: Partial<Task>) => {
-    if (!supabase) {
-      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...updates } : task));
-      return;
-    }
-    try {
-      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
-      if (error) throw error;
-      await loadTasks();
-    } catch (error) {
-      console.error('Error updating task:', error);
-      throw error;
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title: updates.title,
+            description: updates.description,
+            assigned_to: updates.assigned_to,
+            priority: updates.priority,
+            deadline: updates.deadline,
+            status: updates.status
+          })
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error updating task:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error updating task:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, ...updates } : task
+      ));
     }
   };
 
   const deleteTask = async (taskId: string) => {
-    if (!supabase) {
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .eq('id', taskId);
+
+        if (error) {
+          console.error('Error deleting task:', error);
+          throw error;
+        }
+
+        // Refresh tasks to get the updated list
+        await loadTasks();
+      } catch (error) {
+        console.error('Error deleting task:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to local state if Supabase is not available
       setTasks(prev => prev.filter(task => task.id !== taskId));
-      return;
-    }
-    try {
-      const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-      if (error) throw error;
-      await loadTasks();
-    } catch (error) {
-      console.error('Error deleting task:', error);
-      throw error;
     }
   };
 
@@ -680,21 +845,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
       pages: []
     };
     setBrochureProjects(prev => [...prev, newProject]);
-    if (supabase) supabase.from('brochure_projects').insert(newProject).catch(console.error);
+    if (supabase) {
+      supabase.from('brochure_projects').insert(newProject);
+    } else {
+      console.error('Supabase not configured - brochure project not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
     return newProject.id;
   };
 
   const updateBrochureProject = async (id: string, updates: Partial<BrochureProject>) => {
-    setBrochureProjects(prev => prev.map(project => project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project));
-    if (supabase) await supabase.from('brochure_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).catch(console.error);
+    setBrochureProjects(prev => prev.map(project => 
+      project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project
+    ));
+    if (supabase) {
+      await supabase.from('brochure_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    } else {
+      console.error('Supabase not configured - brochure project not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const saveBrochurePage = async (pageData: Omit<BrochurePage, 'id' | 'created_at' | 'updated_at'>) => {
-    const existingPageIndex = brochurePages.findIndex(page => page.project_id === pageData.project_id && page.page_number === pageData.page_number);
+    const existingPageIndex = brochurePages.findIndex(
+      page => page.project_id === pageData.project_id && page.page_number === pageData.page_number
+    );
+
     if (existingPageIndex >= 0) {
-      setBrochurePages(prev => prev.map((page, index) => index === existingPageIndex ? { ...page, content: pageData.content, updated_at: new Date().toISOString() } : page));
-      if (supabase) await supabase.from('brochure_pages').update({ content: pageData.content, updated_at: new Date().toISOString() }).eq('id', brochurePages[existingPageIndex].id).catch(console.error);
+      // Update existing page
+      setBrochurePages(prev => prev.map((page, index) => 
+        index === existingPageIndex 
+          ? { ...page, content: pageData.content, updated_at: new Date().toISOString() }
+          : page
+      ));
+      if (supabase) {
+        await supabase.from('brochure_pages').update({ content: pageData.content, updated_at: new Date().toISOString() }).eq('id', brochurePages[existingPageIndex].id);
+      } else {
+        console.error('Supabase not configured - brochure page not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      }
     } else {
+      // Create new page
       const newPage: BrochurePage = {
         ...pageData,
         approval_status: pageData.approval_status ?? 'pending',
@@ -704,32 +892,61 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updated_at: new Date().toISOString()
       };
       setBrochurePages(prev => [...prev, newPage]);
-      if (supabase) await supabase.from('brochure_pages').insert(newPage).catch(console.error);
+      if (supabase) {
+        await supabase.from('brochure_pages').insert(newPage);
+      } else {
+        console.error('Supabase not configured - brochure page not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      }
     }
   };
 
   const getBrochurePages = (projectId: string): BrochurePage[] => {
-    return brochurePages.filter(page => page.project_id === projectId).sort((a, b) => a.page_number - b.page_number);
+    return brochurePages
+      .filter(page => page.project_id === projectId)
+      .sort((a, b) => a.page_number - b.page_number);
   };
 
   const addPageComment = async (commentData: Omit<PageComment, 'id' | 'timestamp'>) => {
-    const newComment: PageComment = { ...commentData, id: uuidv4(), timestamp: new Date().toISOString() };
+    const newComment: PageComment = {
+      ...commentData,
+      id: uuidv4(),
+      timestamp: new Date().toISOString()
+    };
     setPageComments(prev => [...prev, newComment]);
-    if (supabase) await supabase.from('page_comments').insert(newComment).catch(console.error);
+    if (supabase) {
+      await supabase.from('page_comments').insert(newComment);
+    } else {
+      console.error('Supabase not configured - page comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const getPageComments = (pageId: string): PageComment[] => {
-    return pageComments.filter(comment => comment.page_id === pageId).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return pageComments
+      .filter(comment => comment.page_id === pageId)
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   };
 
   const markCommentDone = async (commentId: string) => {
-    setPageComments(prev => prev.map(comment => comment.id === commentId ? { ...comment, marked_done: true } : comment));
-    if (supabase) await supabase.from('page_comments').update({ marked_done: true }).eq('id', commentId).catch(console.error);
+    setPageComments(prev => prev.map(comment => 
+      comment.id === commentId ? { ...comment, marked_done: true } : comment
+    ));
+    if (supabase) {
+      await supabase.from('page_comments').update({ marked_done: true }).eq('id', commentId);
+    } else {
+      console.error('Supabase not configured - comment status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const approveBrochurePage = (pageId: string, status: 'approved' | 'rejected', comment?: string) => {
-    setBrochurePages(prev => prev.map(page => page.id === pageId ? { ...page, approval_status: status, updated_at: new Date().toISOString() } : page));
-    const actionText = status === 'approved' ? `Page has been approved by ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}` : `Page requires changes - ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}`;
+    setBrochurePages(prev => prev.map(page => 
+      page.id === pageId ? { ...page, approval_status: status, updated_at: new Date().toISOString() } : page
+    ));
+    
+    // Add approval action comment
+    const actionText = status === 'approved' 
+      ? `Page has been approved by ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}`
+      : `Page requires changes - ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}`;
+    
     addPageComment({
       page_id: pageId,
       text: actionText,
@@ -742,34 +959,88 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getBrochureProjectsForReview = (): BrochureProject[] => {
-    return brochureProjects.filter(project => project.status === 'ready_for_design' || project.status === 'in_design');
+    return brochureProjects.filter(project => 
+      project.status === 'ready_for_design' || project.status === 'in_design'
+    );
   };
 
   const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
-    const newLead: Lead = { ...leadData, id: uuidv4(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    const newLead: Lead = {
+      ...leadData,
+      id: uuidv4(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
     setLeads(prev => [...prev, newLead]);
-    if (supabase) await supabase.from('leads').insert(newLead).catch(console.error);
+    if (supabase) {
+      await supabase.from('leads').insert(newLead);
+    } else {
+      console.error('Supabase not configured - lead not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
-    setLeads(prev => prev.map(lead => lead.id === id ? { ...lead, ...updates, updated_at: new Date().toISOString() } : lead));
-    if (supabase) await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id).catch(console.error);
+    setLeads(prev => prev.map(lead => 
+      lead.id === id 
+        ? { ...lead, ...updates, updated_at: new Date().toISOString() }
+        : lead
+    ));
+    if (supabase) {
+      await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const deleteLead = async (id: string) => {
     setLeads(prev => prev.filter(lead => lead.id !== id));
-    if (supabase) await supabase.from('leads').delete().eq('id', id).catch(console.error);
+    if (supabase) {
+      await supabase.from('leads').delete().eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not deleted from database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const lockBrochurePage = async (pageId: string) => {
     if (!user) return;
-    setBrochurePages(prev => prev.map(page => page.id === pageId ? { ...page, is_locked: true, locked_by: user.id, locked_by_name: user.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() } : page));
-    if (supabase) await supabase.from('brochure_pages').update({ is_locked: true, locked_by: user.id, locked_by_name: user.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', pageId).catch(console.error);
+    
+    setBrochurePages(prev => prev.map(page => 
+      page.id === pageId 
+        ? { 
+            ...page, 
+            is_locked: true,
+            locked_by: user.id,
+            locked_by_name: user.name,
+            locked_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        : page
+    ));
+    if (supabase) {
+      await supabase.from('brochure_pages').update({ is_locked: true, locked_by: user?.id, locked_by_name: user?.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', pageId);
+    } else {
+      console.error('Supabase not configured - page lock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const unlockBrochurePage = async (pageId: string) => {
-    setBrochurePages(prev => prev.map(page => page.id === pageId ? { ...page, is_locked: false, locked_by: undefined, locked_by_name: undefined, locked_at: undefined, updated_at: new Date().toISOString() } : page));
-    if (supabase) await supabase.from('brochure_pages').update({ is_locked: false, locked_by: null, locked_by_name: null, locked_at: null, updated_at: new Date().toISOString() }).eq('id', pageId).catch(console.error);
+    setBrochurePages(prev => prev.map(page => 
+      page.id === pageId 
+        ? { 
+            ...page, 
+            is_locked: false,
+            locked_by: undefined,
+            locked_by_name: undefined,
+            locked_at: undefined,
+            updated_at: new Date().toISOString()
+          }
+        : page
+    ));
+    if (supabase) {
+      await supabase.from('brochure_pages').update({ is_locked: false, locked_by: null, locked_by_name: null, locked_at: null, updated_at: new Date().toISOString() }).eq('id', pageId);
+    } else {
+      console.error('Supabase not configured - page unlock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   return (
