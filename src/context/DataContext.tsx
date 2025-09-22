@@ -572,7 +572,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const newGlobalComment: GlobalComment = {
       id: uuidv4(),
       project_id: data.project_id,
-      content: data.content,
+      text: data.content,
       added_by: data.added_by,
       timestamp: new Date().toISOString(),
       author_role: data.author_role
@@ -583,7 +583,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('global_comments')
         .insert({
           project_id: data.project_id,
-          content: data.content,
+          text: data.content,
           added_by: data.added_by,
           timestamp: newGlobalComment.timestamp,
           author_role: data.author_role
