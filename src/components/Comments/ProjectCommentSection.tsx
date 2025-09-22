@@ -10,7 +10,7 @@ interface ProjectCommentSectionProps {
 
 export function ProjectCommentSection({ project }: ProjectCommentSectionProps) {
   const { user } = useAuth();
-  const { globalComments, addGlobalComment, users } = useData();
+  const { globalComments, addGlobalComment } = useData();
   const [newComment, setNewComment] = useState('');
 
   // Get comments for this project

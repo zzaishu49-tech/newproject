@@ -223,6 +223,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [downloadHistory, setDownloadHistory] = useState<DownloadHistory[]>([]);
 
+  const loadGlobalComments = async () => {
+    if (!supabase) return;
+    
+    try {
+      console.log('Loading global comments from Supabase...');
+      const { data, error } = await supabase
+        .from('global_comments')
+        .select(`
+          *,
+          author:profiles!global_comments_added_by_fkey(full_name)
+        `);
+      
+      if (!error && data) {
+        console.log('Global comments loaded successfully:', data.length);
+        const mappedComments: GlobalComment[] = data.map((c: any) => ({
+          id: c.id,
+          project_id: c.project_id,
+          text: c.text,
+          added_by: c.added_by,
+          author_name: c.author?.full_name || 'Unknown User',
+          author_role: c.author_role,
+          timestamp: c.timestamp
+        }));
+        setGlobalComments(mappedComments);
+      } else if (error) {
+        console.error('Supabase error loading global comments:', error);
+      }
+    } catch (error) {
+      console.error('Error loading global comments:', error);
+    }
+  };
+
   const createUserAccount = async (params: { email: string; password: string; full_name: string; role: 'employee' | 'client' }) => {
     if (!supabase) {
       alert('User creation requires Supabase to be configured.');
@@ -338,6 +370,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     refreshUsers();
     loadProjects();
     loadTasks();
+    loadGlobalComments();
     
     // Set up real-time subscriptions
     if (supabase) {
@@ -361,10 +394,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
           loadTasks();
         })
         .subscribe();
+
+      const globalCommentsSubscription = supabase
+        .channel('global_comments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'global_comments' }, () => {
+          loadGlobalComments();
+        })
+        .subscribe();
+
       return () => {
         supabase.removeChannel(projectsSubscription);
         supabase.removeChannel(profilesSubscription);
         supabase.removeChannel(tasksSubscription);
+        supabase.removeChannel(globalCommentsSubscription);
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -574,15 +616,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw new Error('Comment text is required');
     }
 
+    // Get author name from users array
+    const author = users.find(u => u.id === data.added_by);
+    const authorName = author?.name || 'Unknown User';
+
     const newGlobalComment: GlobalComment = {
       id: uuidv4(),
       project_id: data.project_id,
       text: data.text,
       added_by: data.added_by,
+      author_name: authorName,
       timestamp: new Date().toISOString(),
       author_role: data.author_role
     };
-    setGlobalComments(prev => [...prev, newGlobalComment]);
+    
     if (supabase) {
       const { error } = await supabase
         .from('global_comments')
@@ -590,14 +637,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
           project_id: data.project_id,
           text: data.text,
           added_by: data.added_by,
+          author_role: data.author_role,
           timestamp: newGlobalComment.timestamp,
-          author_role: data.author_role
         });
       if (error) {
         console.error('Error adding global comment:', error);
         throw error;
       }
+      // Reload comments to get the updated list with proper author names
+      await loadGlobalComments();
     } else {
+      // Fallback to local state if Supabase is not available
+      setGlobalComments(prev => [...prev, newGlobalComment]);
       console.error('Supabase not configured - global comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
     }
   };
