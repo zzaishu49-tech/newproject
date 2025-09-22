@@ -773,6 +773,16 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
   const renderProjectDetail = () => {
     if (!selectedProject) return null;
 
+    const handleProgressUpdate = async (newProgress: number) => {
+      try {
+        await updateProject(selectedProject.id, { progress_percentage: newProgress });
+        setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
+      } catch (error) {
+        console.error('Error updating project progress:', error);
+        alert('Error updating project progress. Please try again.');
+      }
+    };
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -810,15 +820,38 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
             </div>
             <div>
               <h4 className="font-medium text-gray-900 mb-2">Progress</h4>
-              <div className="flex items-center space-x-3">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
-                  <div
-                    className="h-2 bg-blue-600 rounded-full"
-                    style={{ width: `${selectedProject.progress_percentage}%` }}
-                  />
+              {user?.role === 'manager' ? (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={selectedProject.progress_percentage}
+                      onChange={(e) => handleProgressUpdate(parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      style={{ '--value': `${selectedProject.progress_percentage}%` } as React.CSSProperties}
+                    />
+                    <span className="text-sm font-medium text-gray-900 min-w-[40px]">{selectedProject.progress_percentage}%</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>0%</span>
+                    <span>50%</span>
+                    <span>100%</span>
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{selectedProject.progress_percentage}%</span>
-              </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div
+                      className="h-2 bg-blue-600 rounded-full"
+                      style={{ width: `${selectedProject.progress_percentage}%` }}
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">{selectedProject.progress_percentage}%</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
