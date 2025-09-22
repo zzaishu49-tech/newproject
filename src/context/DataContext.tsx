@@ -22,7 +22,7 @@ interface DataContextType {
   createProject: (project: Omit<Project, 'id' | 'created_at'>) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   addCommentTask: (data: Omit<CommentTask, 'id' | 'timestamp'>) => void;
-  addGlobalComment: (data: { project_id: string; content: string; added_by: string; author_role: string }) => void;
+  addGlobalComment: (data: { project_id: string; text: string; added_by: string; author_role: string }) => void;
   updateCommentTaskStatus: (taskId: string, status: 'open' | 'in-progress' | 'done') => void;
   updateStageApproval: (stageId: string, status: 'approved' | 'rejected', comment?: string) => void;
   uploadFile: (fileData: Omit<File, 'id' | 'timestamp'>) => void;
@@ -568,11 +568,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const addGlobalComment = async (data: { project_id: string; content: string; added_by: string; author_role: string }) => {
+  const addGlobalComment = async (data: { project_id: string; text: string; added_by: string; author_role: string }) => {
+    if (!data.text || data.text.trim() === '') {
+      console.error('Comment text cannot be empty');
+      throw new Error('Comment text is required');
+    }
+
     const newGlobalComment: GlobalComment = {
       id: uuidv4(),
       project_id: data.project_id,
-      text: data.content,
+      text: data.text,
       added_by: data.added_by,
       timestamp: new Date().toISOString(),
       author_role: data.author_role
@@ -583,7 +588,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('global_comments')
         .insert({
           project_id: data.project_id,
-          text: data.content,
+          text: data.text,
           added_by: data.added_by,
           timestamp: newGlobalComment.timestamp,
           author_role: data.author_role
