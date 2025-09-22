@@ -22,6 +22,7 @@ export function BrochureDesign() {
   const { user } = useAuth();
   const { 
     brochureProjects, 
+    projects,
     createBrochureProject, 
     updateBrochureProject,
     saveBrochurePage,
