@@ -561,7 +561,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setCommentTasks(prev => [...prev, newCommentTask]);
-    if (supabase) await supabase.from('comment_tasks').insert(newCommentTask);
+    if (supabase) {
+      await supabase.from('comment_tasks').insert(newCommentTask);
+    } else {
+      console.error('Supabase not configured - comment task not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const addGlobalComment = async (data: Omit<GlobalComment, 'id' | 'timestamp'>) => {
@@ -571,21 +575,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setGlobalComments(prev => [...prev, newGlobalComment]);
-    if (supabase) await supabase.from('global_comments').insert(newGlobalComment);
+    if (supabase) {
+      await supabase.from('global_comments').insert(newGlobalComment);
+    } else {
+      console.error('Supabase not configured - global comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateCommentTaskStatus = async (taskId: string, status: 'open' | 'in-progress' | 'done') => {
     setCommentTasks(prev => prev.map(task => 
       task.id === taskId ? { ...task, status } : task
     ));
-    if (supabase) await supabase.from('comment_tasks').update({ status }).eq('id', taskId);
+    if (supabase) {
+      await supabase.from('comment_tasks').update({ status }).eq('id', taskId);
+    } else {
+      console.error('Supabase not configured - comment task status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateStageApproval = async (stageId: string, status: 'approved' | 'rejected', comment?: string) => {
     setStages(prev => prev.map(s => 
       s.id === stageId ? { ...s, approval_status: status } : s
     ));
-    if (supabase) await supabase.from('stages').update({ approval_status: status }).eq('id', stageId);
+    if (supabase) {
+      await supabase.from('stages').update({ approval_status: status }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage approval not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
     
     if (comment) {
       const stage = stages.find(s => s.id === stageId);
@@ -610,7 +626,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setFiles(prev => [...prev, newFile]);
-    if (supabase) await supabase.from('files').insert(newFile);
+    if (supabase) {
+      await supabase.from('files').insert(newFile);
+    } else {
+      console.error('Supabase not configured - file not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   // Fix for FileManager component - handle File object upload
@@ -640,7 +660,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setStages(prev => prev.map(s => 
       s.id === stageId ? { ...s, progress_percentage: progress } : s
     ));
-    if (supabase) await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId);
+    if (supabase) {
+      await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage progress not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const scheduleMeeting = async (meetingData: Omit<Meeting, 'id'>) => {
@@ -649,7 +673,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       id: uuidv4()
     };
     setMeetings(prev => [...prev, newMeeting]);
-    if (supabase) await supabase.from('meetings').insert(newMeeting);
+    if (supabase) {
+      await supabase.from('meetings').insert(newMeeting);
+    } else {
+      console.error('Supabase not configured - meeting not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
@@ -806,7 +834,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setBrochureProjects(prev => prev.map(project => 
       project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project
     ));
-    if (supabase) await supabase.from('brochure_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    if (supabase) {
+      await supabase.from('brochure_projects').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    } else {
+      console.error('Supabase not configured - brochure project not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const saveBrochurePage = async (pageData: Omit<BrochurePage, 'id' | 'created_at' | 'updated_at'>) => {
@@ -821,7 +853,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           ? { ...page, content: pageData.content, updated_at: new Date().toISOString() }
           : page
       ));
-      if (supabase) await supabase.from('brochure_pages').update({ content: pageData.content, updated_at: new Date().toISOString() }).eq('id', brochurePages[existingPageIndex].id);
+      if (supabase) {
+        await supabase.from('brochure_pages').update({ content: pageData.content, updated_at: new Date().toISOString() }).eq('id', brochurePages[existingPageIndex].id);
+      } else {
+        console.error('Supabase not configured - brochure page not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      }
     } else {
       // Create new page
       const newPage: BrochurePage = {
@@ -833,7 +869,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updated_at: new Date().toISOString()
       };
       setBrochurePages(prev => [...prev, newPage]);
-      if (supabase) await supabase.from('brochure_pages').insert(newPage);
+      if (supabase) {
+        await supabase.from('brochure_pages').insert(newPage);
+      } else {
+        console.error('Supabase not configured - brochure page not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+      }
     }
   };
 
@@ -850,7 +890,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setPageComments(prev => [...prev, newComment]);
-    if (supabase) await supabase.from('page_comments').insert(newComment);
+    if (supabase) {
+      await supabase.from('page_comments').insert(newComment);
+    } else {
+      console.error('Supabase not configured - page comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const getPageComments = (pageId: string): PageComment[] => {
@@ -863,7 +907,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setPageComments(prev => prev.map(comment => 
       comment.id === commentId ? { ...comment, marked_done: true } : comment
     ));
-    if (supabase) await supabase.from('page_comments').update({ marked_done: true }).eq('id', commentId);
+    if (supabase) {
+      await supabase.from('page_comments').update({ marked_done: true }).eq('id', commentId);
+    } else {
+      console.error('Supabase not configured - comment status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const approveBrochurePage = (pageId: string, status: 'approved' | 'rejected', comment?: string) => {
@@ -901,7 +949,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updated_at: new Date().toISOString()
     };
     setLeads(prev => [...prev, newLead]);
-    if (supabase) await supabase.from('leads').insert(newLead);
+    if (supabase) {
+      await supabase.from('leads').insert(newLead);
+    } else {
+      console.error('Supabase not configured - lead not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
@@ -910,12 +962,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
         ? { ...lead, ...updates, updated_at: new Date().toISOString() }
         : lead
     ));
-    if (supabase) await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    if (supabase) {
+      await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const deleteLead = async (id: string) => {
     setLeads(prev => prev.filter(lead => lead.id !== id));
-    if (supabase) await supabase.from('leads').delete().eq('id', id);
+    if (supabase) {
+      await supabase.from('leads').delete().eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not deleted from database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const lockBrochurePage = async (pageId: string) => {
@@ -933,7 +993,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }
         : page
     ));
-    if (supabase) await supabase.from('brochure_pages').update({ is_locked: true, locked_by: user?.id, locked_by_name: user?.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', pageId);
+    if (supabase) {
+      await supabase.from('brochure_pages').update({ is_locked: true, locked_by: user?.id, locked_by_name: user?.name, locked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', pageId);
+    } else {
+      console.error('Supabase not configured - page lock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const unlockBrochurePage = async (pageId: string) => {
@@ -949,7 +1013,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           }
         : page
     ));
-    if (supabase) await supabase.from('brochure_pages').update({ is_locked: false, locked_by: null, locked_by_name: null, locked_at: null, updated_at: new Date().toISOString() }).eq('id', pageId);
+    if (supabase) {
+      await supabase.from('brochure_pages').update({ is_locked: false, locked_by: null, locked_by_name: null, locked_at: null, updated_at: new Date().toISOString() }).eq('id', pageId);
+    } else {
+      console.error('Supabase not configured - page unlock not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   return (
@@ -964,7 +1032,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       meetings,
       brochureProjects,
       brochurePages,
-      pageComments,
+    if (supabase) {
+      supabase.from('brochure_projects').insert(newProject);
+    } else {
+      console.error('Supabase not configured - brochure project not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
       leads,
       downloadHistory,
       createProject,
