@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { BrochurePage, BrochureProject } from '../../types';
@@ -36,7 +37,25 @@ export function BrochureDesign() {
   const [showFeedbackReport, setShowFeedbackReport] = useState(false);
 
   // Get client's brochure projects
-  const clientProjects = brochureProjects.filter(project => project.client_id === user?.id);
+  const accessibleProjects = useMemo(() => {
+    if (user?.role === 'manager') {
+      // Manager can see all brochure projects
+      return brochureProjects;
+    } else if (user?.role === 'employee') {
+      // Employee can see projects they're assigned to
+      const assignedProjectIds = projects
+        .filter(p => p.assigned_employees.includes(user.id))
+        .map(p => p.id);
+      return brochureProjects.filter(bp => {
+        const relatedProject = projects.find(p => p.client_id === bp.client_id);
+        return relatedProject && assignedProjectIds.includes(relatedProject.id);
+      });
+    } else if (user?.role === 'client') {
+      // Client can only see their own projects
+      return brochureProjects.filter(project => project.client_id === user.id);
+    }
+    return [];
+  }, [brochureProjects, projects, user]);
 
   // Auto-save functionality with debounce
   const debouncedSave = useCallback(
@@ -166,55 +185,79 @@ export function BrochureDesign() {
   };
 
   const isPageEditable = () => {
-    if (user?.role !== 'client') return true; // Managers and employees can always edit
+    if (user?.role === 'manager') return true; // Managers can always edit
     const page = getCurrentPage();
-    return !page?.is_locked; // Clients can only edit if page is not locked
+    return !page?.is_locked; // Others can only edit if page is not locked
   };
   if (!currentProject) {
     return (
       <div className="p-6">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Brochure Design</h2>
-          <p className="text-gray-600">Create and manage your brochure design projects</p>
+          <p className="text-gray-600">
+            {user?.role === 'client' 
+              ? 'Create and manage your brochure design projects'
+              : user?.role === 'manager'
+              ? 'Manage all brochure design projects'
+              : 'Work on assigned brochure design projects'
+            }
+          </p>
         </div>
 
-        {clientProjects.length === 0 ? (
+        {accessibleProjects.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FileText className="w-12 h-12 text-red-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No brochure projects yet</h3>
-            <p className="text-gray-600 mb-6">Create your first brochure design project to get started</p>
-            <button
-              onClick={handleCreateProject}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Create New Brochure Project</span>
-            </button>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {user?.role === 'client' ? 'No brochure projects yet' : 'No accessible brochure projects'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {user?.role === 'client' 
+                ? 'Create your first brochure design project to get started'
+                : user?.role === 'manager'
+                ? 'No brochure projects have been created yet'
+                : 'No brochure projects assigned to you yet'
+              }
+            </p>
+            {user?.role === 'client' && (
+              <button
+                onClick={handleCreateProject}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 mx-auto"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Create New Brochure Project</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Your Brochure Projects</h3>
-              <button
-                onClick={handleCreateProject}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>New Project</span>
-              </button>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {user?.role === 'client' ? 'Your Brochure Projects' : 'Brochure Projects'}
+              </h3>
+              {user?.role === 'client' && (
+                <button
+                  onClick={handleCreateProject}
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>New Project</span>
+                </button>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {clientProjects.map(project => (
+              {accessibleProjects.map(project => (
                 <div
                   key={project.id}
                   onClick={() => setCurrentProject(project)}
                   className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md cursor-pointer transition-shadow"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-900">Brochure Project</h4>
+                    <h4 className="font-medium text-gray-900">
+                      {user?.role === 'client' ? 'Brochure Project' : `${project.client_name}'s Brochure`}
+                    </h4>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       project.status === 'draft' ? 'bg-gray-100 text-gray-800' :
                       project.status === 'ready_for_design' ? 'bg-blue-100 text-blue-800' :
@@ -227,6 +270,11 @@ export function BrochureDesign() {
                   <p className="text-sm text-gray-600">
                     Created: {new Date(project.created_at).toLocaleDateString()}
                   </p>
+                  {user?.role !== 'client' && (
+                    <p className="text-sm text-gray-600">
+                      Client: {project.client_name}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -235,6 +283,17 @@ export function BrochureDesign() {
       </div>
     );
   }
+
+  // Check if current user can edit this project
+  const canEdit = useMemo(() => {
+    if (user?.role === 'manager') return true;
+    if (user?.role === 'client' && currentProject.client_id === user.id) return true;
+    if (user?.role === 'employee') {
+      const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
+      return relatedProject && relatedProject.assigned_employees.includes(user.id);
+    }
+    return false;
+  }, [user, currentProject, projects]);
 
   return (
     <div className="p-6">
@@ -252,14 +311,15 @@ export function BrochureDesign() {
             >
               ← Back to Projects
             </button>
-            <button
-              onClick={addNewPage}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Page</span>
-            </button>
-            {/* Preview toggle removed; live editor only */}
+            {canEdit && (
+              <button
+                onClick={addNewPage}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Page</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -296,7 +356,7 @@ export function BrochureDesign() {
             )}
           </div>
           
-          {currentProject.status === 'draft' && (
+          {currentProject.status === 'draft' && canEdit && user?.role === 'client' && (
             <button
               onClick={handleSubmitProject}
               className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2"
@@ -321,8 +381,8 @@ export function BrochureDesign() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-3">
-          {/* Lock Status Banner for Clients */}
-          {user?.role === 'client' && !isPageEditable() && (
+          {/* Lock Status Banner */}
+          {!isPageEditable() && (
             <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-center space-x-3">
                 <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
@@ -331,7 +391,7 @@ export function BrochureDesign() {
                 <div>
                   <h4 className="font-semibold text-yellow-800">Page Locked for Editing</h4>
                   <p className="text-sm text-yellow-700">
-                    This page has been locked by the design team. You cannot make changes until it's unlocked.
+                    This page has been locked. You cannot make changes until it's unlocked.
                     {getCurrentPage()?.locked_by_name && (
                       <span className="block mt-1">
                         Locked by: {getCurrentPage()?.locked_by_name} on {getCurrentPage()?.locked_at ? new Date(getCurrentPage()!.locked_at!).toLocaleDateString() : ''}
@@ -348,7 +408,7 @@ export function BrochureDesign() {
             pageNumber={currentPage}
             pageData={pageData}
             onDataChange={setPageData}
-            isEditable={isPageEditable()}
+            isEditable={isPageEditable() && canEdit}
           />
 
           {/* Page Navigation */}

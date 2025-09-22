@@ -862,7 +862,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
-              { id: 'brochure', label: 'Brochure Review', icon: FileText },
+              { id: 'brochure', label: 'Brochure Design', icon: FileText },
               { id: 'tasks', label: 'Tasks', icon: CheckSquare },
               { id: 'comments', label: 'Comments', icon: MessageSquare }
             ].map(tab => {
@@ -887,7 +887,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
 
         {/* Tab Content */}
         <div>
-          {projectDetailTab === 'brochure' && <BrochureReview />}
+          {projectDetailTab === 'brochure' && <BrochureDesign />}
           {projectDetailTab === 'tasks' && (
             <TaskManager project={selectedProject} />
           )}
