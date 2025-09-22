@@ -81,7 +81,7 @@ export function BrochureDesign() {
       });
       setLastSaved(new Date());
       setIsSaving(false);
-    }, 1000),
+    }, 2000),
     [saveBrochurePage]
   );
 
@@ -100,7 +100,7 @@ export function BrochureDesign() {
 
   // Auto-save when page data changes
   useEffect(() => {
-    if (currentProject && Object.keys(pageData).length > 0) {
+    if (currentProject && pageData && Object.keys(pageData).length > 0) {
       debouncedSave(currentProject.id, currentPage, pageData);
     }
   }, [pageData, currentProject, currentPage, debouncedSave]);

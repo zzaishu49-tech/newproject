@@ -26,10 +26,11 @@ export function BrochurePageEditor({
   isEditable = true
 }: BrochurePageEditorProps) {
   const [localData, setLocalData] = useState<BrochurePage['content']>(pageData);
-  // ReactQuill manages its own editor instance (no local ref needed)
+  const [editorValue, setEditorValue] = useState<string>((pageData.body_content as string) || '');
 
   useEffect(() => {
     setLocalData(pageData);
+    setEditorValue((pageData.body_content as string) || '');
   }, [pageData]);
 
   const handleInputChange = (field: string, value: any) => {
@@ -39,7 +40,12 @@ export function BrochurePageEditor({
     onDataChange(newData);
   };
 
-  // ReactQuill handles focus internally
+  const handleEditorChange = (html: string) => {
+    if (!isEditable) return;
+    const normalized = normalizeReversedWordsInHTML(html);
+    setEditorValue(normalized);
+    handleInputChange('body_content', normalized);
+  };
 
   // Heuristic-based reversed word fixer for English-looking words
   const reverseString = (s: string) => s.split('').reverse().join('');
@@ -127,11 +133,8 @@ export function BrochurePageEditor({
           </label>
           <ReactQuill
             theme="snow"
-            value={(localData.body_content as string) || ''}
-            onChange={(html) => {
-              const normalized = normalizeReversedWordsInHTML(html);
-              handleInputChange('body_content', normalized);
-            }}
+            value={editorValue}
+            onChange={handleEditorChange}
             readOnly={!isEditable}
             modules={{
               toolbar: [
