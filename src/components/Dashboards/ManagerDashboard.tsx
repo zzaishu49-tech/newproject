@@ -810,7 +810,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
       </div>
     </div>
   );
-
+ };
 
         {/* Project Info */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
