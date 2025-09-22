@@ -28,6 +28,7 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   const { 
     brochureProjects, 
     projects,
+    users,
     createBrochureProject, 
     updateBrochureProject,
     saveBrochurePage,
