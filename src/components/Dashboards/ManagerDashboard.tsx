@@ -770,42 +770,47 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
     </div>
   );
 
-  const renderProjectDetail = () => {
-    if (!selectedProject) return null;
+ const renderProjectDetail = () => {
+  const { user } = useAuth(); // Add user from context
+  if (!selectedProject || !user) return null; // Add user check
 
-    const handleProgressUpdate = async (newProgress: number) => {
-      try {
-        await updateProject(selectedProject.id, { progress_percentage: newProgress });
-        setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
-      } catch (error) {
-        console.error('Error updating project progress:', error);
-        alert('Error updating project progress. Please try again.');
-      }
-    };
+  const handleProgressUpdate = async (newProgress: number) => {
+    try {
+      await updateProject(selectedProject.id, { progress_percentage: newProgress }, user); // Pass user
+      setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
+    } catch (error) {
+      console.error('Error updating project progress:', error);
+      alert('Error updating project progress. Please try again.');
+    }
+  };
 
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setShowProjectDetail(false)}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              ← Back to Projects
-            </button>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">{selectedProject.title}</h2>
-              <p className="text-gray-600">{selectedProject.description}</p>
-            </div>
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowProjectDetail(false)}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            ← Back to Projects
+          </button>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{selectedProject.title}</h2>
+            <p className="text-gray-600">{selectedProject.description}</p>
+            <p>Owner: {user.name}</p> {/* Example usage of user */}
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            selectedProject.status === 'active' ? 'bg-green-100 text-green-800' :
-            selectedProject.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-            'bg-yellow-100 text-yellow-800'
-          }`}>
-            {selectedProject.status}
-          </span>
         </div>
+        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+          selectedProject.status === 'active' ? 'bg-green-100 text-green-800' :
+          selectedProject.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+          'bg-yellow-100 text-yellow-800'
+        }`}>
+          {selectedProject.status}
+        </span>
+      </div>
+    </div>
+  );
+
 
         {/* Project Info */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
