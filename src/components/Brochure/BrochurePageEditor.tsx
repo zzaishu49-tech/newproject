@@ -42,48 +42,8 @@ export function BrochurePageEditor({
 
   const handleEditorChange = (html: string) => {
     if (!isEditable) return;
-    const normalized = normalizeReversedWordsInHTML(html);
-    setEditorValue(normalized);
-    handleInputChange('body_content', normalized);
-  };
-
-  // Heuristic-based reversed word fixer for English-looking words
-  const reverseString = (s: string) => s.split('').reverse().join('');
-  const bigramSet = new Set([
-    'th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar',
-    'st','to','nt','ng','se','ha','as','ou','io','le','is','ve','co','me','de','hi','ri','ro','ic','ne',
-    'll','el','lo','wh','sh','ch','pr','pl','tr','qu','re','com','con','pro','pre'
-  ]);
-  const scoreEnglishness = (word: string) => {
-    let score = 0;
-    const lower = word.toLowerCase();
-    for (let i = 0; i < lower.length - 1; i++) {
-      const bg = lower.substring(i, i + 2);
-      if (bigramSet.has(bg)) score++;
-    }
-    return score;
-  };
-  const shouldReverseWord = (word: string) => {
-    if (!/^[A-Za-z]{3,}$/.test(word)) return false;
-    const rev = reverseString(word);
-    return scoreEnglishness(rev) > scoreEnglishness(word);
-  };
-  const normalizeReversedWordsInText = (text: string) => {
-    return text.replace(/[A-Za-z]{3,}/g, (w) => (shouldReverseWord(w) ? reverseString(w) : w));
-  };
-  const normalizeReversedWordsInHTML = (html: string) => {
-    const container = document.createElement('div');
-    container.innerHTML = html;
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    const textNodes: Text[] = [];
-    let node: Node | null;
-    while ((node = walker.nextNode())) {
-      textNodes.push(node as Text);
-    }
-    textNodes.forEach((tn) => {
-      tn.nodeValue = normalizeReversedWordsInText(tn.nodeValue || '');
-    });
-    return container.innerHTML;
+    setEditorValue(html);
+    handleInputChange('body_content', html);
   };
 
   const handleFileUpload = (file: File) => {
