@@ -40,6 +40,7 @@ interface ManagerDashboardProps {
 
 export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardProps) {
   const { projects, stages, commentTasks, leads, users, createLead, updateLead, deleteLead, createUserAccount, refreshUsers, loadProjects } = useData();
+  const { user } = useAuth(); // Get user from context
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -770,47 +771,42 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
     </div>
   );
 
- const renderProjectDetail = () => {
-  const { user } = useAuth(); // Add user from context
-  if (!selectedProject || !user) return null; // Add user check
+  const renderProjectDetail = () => {
+    if (!selectedProject || !user) return null; // Add user check
 
-  const handleProgressUpdate = async (newProgress: number) => {
-    try {
-      await updateProject(selectedProject.id, { progress_percentage: newProgress }, user); // Pass user
-      setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
-    } catch (error) {
-      console.error('Error updating project progress:', error);
-      alert('Error updating project progress. Please try again.');
-    }
-  };
+    const handleProgressUpdate = async (newProgress: number) => {
+      try {
+        await updateProject(selectedProject.id, { progress_percentage: newProgress }, user); // Pass user
+        setSelectedProject(prev => prev ? { ...prev, progress_percentage: newProgress } : null);
+      } catch (error) {
+        console.error('Error updating project progress:', error);
+        alert('Error updating project progress. Please try again.');
+      }
+    };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setShowProjectDetail(false)}
-            className="text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            ← Back to Projects
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">{selectedProject.title}</h2>
-            <p className="text-gray-600">{selectedProject.description}</p>
-            <p>Owner: {user.name}</p> {/* Example usage of user */}
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowProjectDetail(false)}
+              className="text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              ← Back to Projects
+            </button>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{selectedProject.title}</h2>
+              <p className="text-gray-600">{selectedProject.description}</p>
+            </div>
           </div>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+            selectedProject.status === 'active' ? 'bg-green-100 text-green-800' :
+            selectedProject.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+            'bg-yellow-100 text-yellow-800'
+          }`}>
+            {selectedProject.status}
+          </span>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          selectedProject.status === 'active' ? 'bg-green-100 text-green-800' :
-          selectedProject.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-          'bg-yellow-100 text-yellow-800'
-        }`}>
-          {selectedProject.status}
-        </span>
-      </div>
-    </div>
-  );
- };
 
         {/* Project Info */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -825,7 +821,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
             </div>
             <div>
               <h4 className="font-medium text-gray-900 mb-2">Progress</h4>
-              {user?.role === 'manager' ? (
+              {user.role === 'manager' ? (
                 <div className="space-y-2">
                   <div className="flex items-center space-x-3">
                     <input
