@@ -5,6 +5,7 @@ import { Project } from '../../types';
 import { StorageManager } from '../Storage/StorageManager';
 import { CommentManager } from '../Comments/CommentManager';
 import { BrochureDesign } from '../Brochure/BrochureDesign';
+import { ProjectCommentSection } from '../Comments/ProjectCommentSection';
 import { ClientFeedbackReport } from '../Reports/ClientFeedbackReport';
 import { CheckSquare, Layers, Upload, MessageSquare, Eye, TrendingUp, Clock, CheckCircle, BarChart3, Briefcase, FileText, User, Calendar } from 'lucide-react';
 
@@ -339,7 +340,8 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
           <nav className="flex space-x-8">
             {[
               { id: 'brochure', label: 'Brochure Design', icon: FileText },
-              { id: 'comments', label: 'Comments', icon: MessageSquare }
+              { id: 'comments', label: 'Comments', icon: MessageSquare },
+              { id: 'project-comments', label: 'Project Discussion', icon: MessageSquare }
             ].map(tab => {
               const Icon = tab.icon;
               return (
@@ -364,6 +366,9 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
         <div>
           {projectDetailTab === 'brochure' && <BrochureDesign />}
           {projectDetailTab === 'comments' && <CommentManager />}
+          {projectDetailTab === 'project-comments' && (
+            <ProjectCommentSection project={selectedProject} />
+          )}
         </div>
       </div>
     );

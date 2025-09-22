@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { ProjectCard } from '../Projects/ProjectCard';
 import { EmployeeTaskCard } from '../Tasks/EmployeeTaskCard';
+import { ProjectCommentSection } from '../Comments/ProjectCommentSection';
 import { Project } from '../../types';
 import { 
   Briefcase, 
@@ -316,13 +317,7 @@ export function EmployeeDashboard({ activeView, onViewChange }: EmployeeDashboar
             </div>
           )}
           {projectDetailTab === 'comments' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-              <div className="text-center">
-                <MessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Project Comments</h3>
-                <p className="text-gray-600">Project comments and discussions will be available here</p>
-              </div>
-            </div>
+            <ProjectCommentSection project={selectedProject} />
           )}
         </div>
       </div>

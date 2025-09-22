@@ -9,6 +9,7 @@ import { CommentManager } from '../Comments/CommentManager';
 import { BrochureReview } from '../Brochure/BrochureReview';
 import { DocumentDownloadCenter } from '../Documents/DocumentDownloadCenter';
 import { TaskManager } from '../Tasks/TaskManager';
+import { ProjectCommentSection } from '../Comments/ProjectCommentSection';
 import { Project, User, Lead } from '../../types';
 import { 
   Plus, 
@@ -862,7 +863,8 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
           <nav className="flex space-x-8">
             {[
               { id: 'brochure', label: 'Brochure Review', icon: FileText },
-              { id: 'tasks', label: 'Tasks', icon: CheckSquare }
+              { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+              { id: 'comments', label: 'Comments', icon: MessageSquare }
             ].map(tab => {
               const Icon = tab.icon;
               return (
@@ -888,6 +890,9 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
           {projectDetailTab === 'brochure' && <BrochureReview />}
           {projectDetailTab === 'tasks' && (
             <TaskManager project={selectedProject} />
+          )}
+          {projectDetailTab === 'comments' && (
+            <ProjectCommentSection project={selectedProject} />
           )}
         </div>
       </div>
