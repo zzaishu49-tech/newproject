@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { Project } from '../../types';
-import { StageApproval } from '../Stages/StageApproval';
 import { StorageManager } from '../Storage/StorageManager';
 import { CommentManager } from '../Comments/CommentManager';
 import { BrochureDesign } from '../Brochure/BrochureDesign';
@@ -59,7 +58,7 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
     setShowProjectDetail(true);
-    setProjectDetailTab('stages');
+    setProjectDetailTab('brochure');
   };
 
   const renderDashboard = () => (
@@ -339,7 +338,6 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
             {[
-              { id: 'stages', label: 'Stages', icon: Layers },
               { id: 'brochure', label: 'Brochure Design', icon: FileText },
               { id: 'comments', label: 'Comments', icon: MessageSquare }
             ].map(tab => {
@@ -364,17 +362,6 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
 
         {/* Tab Content */}
         <div>
-          {projectDetailTab === 'stages' && (
-            <div className="space-y-6">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Project Stages</h3>
-                <p className="text-gray-600">Review and approve each stage of your project</p>
-              </div>
-              {projectStages.map(stage => (
-                <StageApproval key={stage.id} stage={stage} />
-              ))}
-            </div>
-          )}
           {projectDetailTab === 'brochure' && <BrochureDesign />}
           {projectDetailTab === 'comments' && <CommentManager />}
         </div>
@@ -382,17 +369,6 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
     );
   };
 
-  const renderStages = () => (
-    <div className="space-y-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Project Stages</h2>
-        <p className="text-gray-600">Review and approve each stage of your project</p>
-      </div>
-      {projectStages.map(stage => (
-        <StageApproval key={stage.id} stage={stage} />
-      ))}
-    </div>
-  );
 
   // Show project detail if selected
   if (showProjectDetail && selectedProject) {

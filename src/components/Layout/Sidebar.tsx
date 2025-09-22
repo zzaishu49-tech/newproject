@@ -28,12 +28,6 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     { id: 'projects', label: 'Projects', icon: FolderOpen },
     { id: 'employees', label: 'Employees', icon: Users },
     { id: 'leads', label: 'Leads', icon: TrendingUp }
-    // { id: 'stages', label: 'Stages', icon: Layers },
-    // { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-    // { id: 'brochure-review', label: 'Brochure Review', icon: FileText },
-    // { id: 'documents', label: 'Document Center', icon: Upload },
-    // { id: 'storage', label: 'Storage', icon: Upload },
-    // { id: 'comments', label: 'Comments', icon: MessageSquare }
   ];
 
   const getEmployeeMenuItems = () => [

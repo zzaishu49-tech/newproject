@@ -8,7 +8,6 @@ import { StorageManager } from '../Storage/StorageManager';
 import { CommentManager } from '../Comments/CommentManager';
 import { BrochureReview } from '../Brochure/BrochureReview';
 import { DocumentDownloadCenter } from '../Documents/DocumentDownloadCenter';
-import { StageDetail } from '../Stages/StageDetail';
 import { TaskManager } from '../Tasks/TaskManager';
 import { Project, User, Lead } from '../../types';
 import { 
@@ -829,8 +828,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
           <nav className="flex space-x-8">
             {[
               { id: 'brochure', label: 'Brochure Review', icon: FileText },
-              { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-              { id: 'stages', label: 'Stages', icon: Layers }
+              { id: 'tasks', label: 'Tasks', icon: CheckSquare }
             ].map(tab => {
               const Icon = tab.icon;
               return (
@@ -857,7 +855,6 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
           {projectDetailTab === 'tasks' && (
             <TaskManager project={selectedProject} />
           )}
-          {projectDetailTab === 'stages' && <StageDetail project={selectedProject} onBack={() => setShowProjectDetail(false)} />}
         </div>
       </div>
     );
