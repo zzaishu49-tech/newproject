@@ -773,8 +773,6 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
   const renderProjectDetail = () => {
     if (!selectedProject) return null;
 
-    const { user } = useAuth();
-
     const handleProgressUpdate = async (newProgress: number) => {
       try {
         await updateProject(selectedProject.id, { progress_percentage: newProgress });
