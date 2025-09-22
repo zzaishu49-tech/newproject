@@ -48,10 +48,9 @@ export function BrochurePageViewer({ page, project }: BrochurePageViewerProps) {
         </div>
 
         {/* Text Content */}
-        {content.text_content ? (
+        {content.body_content ? (
           <div className="prose max-w-none">
-            <div className="text-gray-700 leading-relaxed whitespace-pre-line">
-              {content.text_content}
+            <div className="text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: content.body_content }}>
             </div>
           </div>
         ) : (
@@ -78,6 +77,7 @@ export function BrochurePageViewer({ page, project }: BrochurePageViewerProps) {
             </div>
           </div>
         ) : content.text_content ? (
+        ) : content.body_content ? (
           <div className="text-center py-4 text-gray-400">
             <ImageIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
             <p className="text-sm">No images provided</p>
@@ -102,7 +102,7 @@ export function BrochurePageViewer({ page, project }: BrochurePageViewerProps) {
   );
 
   const hasContent = () => {
-    return content.text_content || (content.images && content.images.length > 0);
+    return content.body_content || (content.images && content.images.length > 0);
   };
 
   return (
