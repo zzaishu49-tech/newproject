@@ -37,6 +37,18 @@ export function BrochureDesign() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showFeedbackReport, setShowFeedbackReport] = useState(false);
 
+  // Check if current user can edit this project
+  const canEdit = useMemo(() => {
+    if (!user || !currentProject) return false;
+    if (user.role === 'manager') return true;
+    if (user.role === 'client' && currentProject.client_id === user.id) return true;
+    if (user.role === 'employee') {
+      const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
+      return relatedProject && relatedProject.assigned_employees.includes(user.id);
+    }
+    return false;
+  }, [user, currentProject, projects]);
+
   // Get client's brochure projects
   const accessibleProjects = useMemo(() => {
     if (user?.role === 'manager') {
@@ -284,17 +296,6 @@ export function BrochureDesign() {
       </div>
     );
   }
-
-  // Check if current user can edit this project
-  const canEdit = useMemo(() => {
-    if (user?.role === 'manager') return true;
-    if (user?.role === 'client' && currentProject.client_id === user.id) return true;
-    if (user?.role === 'employee') {
-      const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
-      return relatedProject && relatedProject.assigned_employees.includes(user.id);
-    }
-    return false;
-  }, [user, currentProject, projects]);
 
   return (
     <div className="p-6">
