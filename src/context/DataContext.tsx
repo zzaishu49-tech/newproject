@@ -339,7 +339,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const projectsSubscription = supabase
       .channel('projects')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => loadProjects())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => loadProjects())
       .subscribe();
 
     const profilesSubscription = supabase
@@ -502,11 +502,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw new Error('Permission denied');
     }
 
-    // Validate that added_by exists in profiles
+    // Validate or create profile for added_by
     const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('id', data.added_by).single();
     if (profileError || !profile) {
-      console.error('Profile not found for added_by:', data.added_by, profileError);
-      throw new Error('Invalid user ID for comment');
+      console.warn('Profile not found for added_by, creating minimal profile:', data.added_by);
+      const { error: createError } = await supabase.from('profiles').insert({ id: data.added_by, full_name: 'Unknown User', role: 'unknown' }, { onConflict: 'id' });
+      if (createError) {
+        console.error('Failed to create profile:', createError);
+        throw new Error('Failed to create missing user profile');
+      }
+      await refreshUsers(); // Sync local state
     }
 
     const newGlobalComment: GlobalComment = {
