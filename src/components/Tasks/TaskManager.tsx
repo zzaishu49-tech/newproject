@@ -81,8 +81,7 @@ export function TaskManager({ project }: TaskManagerProps) {
       if (editingTask) {
         await updateTask(editingTask.id, {
           ...taskForm,
-          priority: taskForm.priority || 'medium',
-          updated_at: new Date().toISOString()
+          priority: taskForm.priority || 'medium'
         });
       } else {
         const taskData = {
