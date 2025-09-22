@@ -236,12 +236,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return null;
     }
     const userId = data.user.id;
-    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: userId, full_name, role, email });
+    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: userId, full_name, role, email }, { onConflict: 'id' });
     if (upsertErr) {
+      console.error('Error upserting profile:', upsertErr);
       alert(upsertErr.message);
       return null;
     }
     setUsers(prev => [...prev, { id: userId, name: full_name, email, role } as User]);
+    await refreshUsers();
     return { id: userId };
   };
 
@@ -498,6 +500,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (user.role !== 'manager' && user.id !== project.client_id && !project.assigned_employees.includes(user.id)) {
       console.error('User lacks permission for project:', { userId: user.id, projectId: data.project_id });
       throw new Error('Permission denied');
+    }
+
+    // Validate that added_by exists in profiles
+    const { data: profile, error: profileError } = await supabase.from('profiles').select('id').eq('id', data.added_by).single();
+    if (profileError || !profile) {
+      console.error('Profile not found for added_by:', data.added_by, profileError);
+      throw new Error('Invalid user ID for comment');
     }
 
     const newGlobalComment: GlobalComment = {
