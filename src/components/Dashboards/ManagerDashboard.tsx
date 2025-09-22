@@ -40,7 +40,7 @@ interface ManagerDashboardProps {
 }
 
 export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardProps) {
-  const { projects, stages, commentTasks, leads, users, createLead, updateLead, deleteLead, createUserAccount, refreshUsers } = useData();
+  const { projects, stages, commentTasks, leads, users, createLead, updateLead, deleteLead, createUserAccount, refreshUsers, loadProjects } = useData();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
