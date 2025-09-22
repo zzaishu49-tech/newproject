@@ -18,7 +18,12 @@ import {
   BarChart3
 } from 'lucide-react';
 
-export function BrochureDesign() {
+interface BrochureDesignProps {
+  initialBrochureProject?: BrochureProject;
+  onBack?: () => void;
+}
+
+export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesignProps = {}) {
   const { user } = useAuth();
   const { 
     brochureProjects, 
@@ -29,7 +34,7 @@ export function BrochureDesign() {
     getBrochurePages
   } = useData();
 
-  const [currentProject, setCurrentProject] = useState<BrochureProject | null>(null);
+  const [currentProject, setCurrentProject] = useState<BrochureProject | null>(initialBrochureProject || null);
   const [currentPage, setCurrentPage] = useState(1);
   // Live editor only (no preview mode)
   const [pageData, setPageData] = useState<BrochurePage['content']>({});
@@ -40,17 +45,23 @@ export function BrochureDesign() {
   // Check if current user can edit this project
   const canEdit = useMemo(() => {
     if (!user || !currentProject) return false;
-    if (user.role === 'manager') return true;
+    // If this is accessed from manager dashboard with initialBrochureProject, managers can't edit directly
+    if (user.role === 'manager' && !initialBrochureProject) return true;
     if (user.role === 'client' && currentProject.client_id === user.id) return true;
     if (user.role === 'employee') {
       const relatedProject = projects.find(p => p.client_id === currentProject.client_id);
       return relatedProject && relatedProject.assigned_employees.includes(user.id);
     }
     return false;
-  }, [user, currentProject, projects]);
+  }, [user, currentProject, projects, initialBrochureProject]);
 
   // Get client's brochure projects
   const accessibleProjects = useMemo(() => {
+    // If initialBrochureProject is provided, only show that project
+    if (initialBrochureProject) {
+      return [initialBrochureProject];
+    }
+    
     if (user?.role === 'manager') {
       // Manager can see all brochure projects
       return brochureProjects;
@@ -68,7 +79,7 @@ export function BrochureDesign() {
       return brochureProjects.filter(project => project.client_id === user.id);
     }
     return [];
-  }, [brochureProjects, projects, user]);
+  }, [brochureProjects, projects, user, initialBrochureProject]);
 
   // Auto-save functionality with debounce
   const debouncedSave = useCallback(
@@ -308,10 +319,16 @@ export function BrochureDesign() {
           </div>
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => setCurrentProject(null)}
+              onClick={() => {
+                if (onBack) {
+                  onBack();
+                } else {
+                  setCurrentProject(null);
+                }
+              }}
               className="text-gray-600 hover:text-gray-900 transition-colors"
             >
-              ← Back to Projects
+              ← {onBack ? 'Back to Project' : 'Back to Projects'}
             </button>
             {canEdit && (
               <button
