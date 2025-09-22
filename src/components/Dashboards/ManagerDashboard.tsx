@@ -240,13 +240,21 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
           <h2 className="text-3xl font-bold text-gray-900 mb-2">Project Management</h2>
           <p className="text-gray-600 text-lg">Manage all projects and team assignments</p>
         </div>
-        <button
-          onClick={() => setIsProjectModalOpen(true)}
-          className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg transform hover:scale-105"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Project</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => loadProjects()}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-3 rounded-xl font-semibold transition-all duration-200"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => setIsProjectModalOpen(true)}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center space-x-2 shadow-md hover:shadow-lg transform hover:scale-105"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Project</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
