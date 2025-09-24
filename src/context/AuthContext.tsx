@@ -50,6 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (signup.error) {
           throw new Error(signup.error.message || 'Sign up failed');
         }
+        if (!signup.data.user) {
+          throw new Error('User account creation failed - no user returned');
+        }
         // Insert/Upsert profile with manager role
         await supabase.from('profiles').upsert({
           id: signup.data.user?.id,
