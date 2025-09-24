@@ -99,14 +99,11 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
       
       // Clear form and close modal
       setIsUserModalOpen(false);
-      setUserEmail(''); 
-      setUserPassword(''); 
-      setUserFullName('');
-      
-      // Show success message
-      alert(`${userRoleToCreate === 'employee' ? 'Employee' : 'Client'} created successfully!`);
-      
-      // Refresh users list
+    } catch (error) {
+      console.error('Error creating user:', error);
+      setUserCreationError(error instanceof Error ? error.message : 'Failed to create user');
+    }
+  };
       await refreshUsers();
     } catch (error) {
       console.error('Error creating user:', error);
