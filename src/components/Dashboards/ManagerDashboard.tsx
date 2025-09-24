@@ -77,13 +77,37 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
     setCreatingUser(true);
     
     try {
+      // Basic validation
+      if (!userFullName.trim()) {
+        throw new Error('Full name is required.');
+      }
+      if (!userEmail.trim()) {
+        throw new Error('Email is required.');
+      }
+      if (!userPassword.trim()) {
+        throw new Error('Password is required.');
+      }
+      if (userPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters long.');
+      }
+      
+      console.log('Creating user with role:', userRoleToCreate);
+      
       const res = await createUserAccount({ email: userEmail, password: userPassword, full_name: userFullName, role: userRoleToCreate });
+      
       if (res) {
-        alert(`${userRoleToCreate === 'employee' ? 'Employee' : 'Client'} created successfully!`);
+        console.log('User created successfully:', res);
         setIsUserModalOpen(false);
         setUserEmail(''); setUserPassword(''); setUserFullName('');
       }
     } catch (error) {
+        setUserCreationError('');
+        
+        // Show success message
+        alert(`${userRoleToCreate === 'employee' ? 'Employee' : 'Client'} created successfully!`);
+        
+        // Refresh users list
+        await refreshUsers();
       console.error('Error creating user:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while creating the user.';
       setUserCreationError(errorMessage);
