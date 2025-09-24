@@ -72,7 +72,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
   const [userCreationError, setUserCreationError] = useState('');
 
   const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateUser = async () => {
     setUserCreationError('');
     setCreatingUser(true);
     
