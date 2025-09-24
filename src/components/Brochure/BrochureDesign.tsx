@@ -146,7 +146,7 @@ export function BrochureDesign({ initialBrochureProject, onBack, projectId }: Br
     // If projectId is provided, use the project's client
     if (projectId) {
       const project = projects.find(p => p.id === projectId);
-      if (project) {
+      if (project && users.find(u => u.id === project.client_id)) {
         const brochureProjectId = createBrochureProject(projectId, project.client_id, project.client_name);
         const newProject = brochureProjects.find(p => p.id === brochureProjectId);
         if (newProject) {
@@ -154,30 +154,37 @@ export function BrochureDesign({ initialBrochureProject, onBack, projectId }: Br
           setCurrentPage(1);
         }
         return;
+      } else {
+        alert('Cannot create brochure project: Project or client profile not found.');
+        return;
       }
     }
     
     // Fallback: For managers and employees, create project for the first available client
     if (user.role === 'manager' || user.role === 'employee') {
       const firstProject = projects[0];
-      if (firstProject) {
+      if (firstProject && users.find(u => u.id === firstProject.client_id)) {
         const brochureProjectId = createBrochureProject(firstProject.id, firstProject.client_id, firstProject.client_name);
         const newProject = brochureProjects.find(p => p.id === brochureProjectId);
         if (newProject) {
           setCurrentProject(newProject);
           setCurrentPage(1);
         }
+      } else {
+        alert('Cannot create brochure project: No valid projects or client profiles available.');
       }
     } else if (user.role === 'client') {
       // For clients, find their project
       const clientProject = projects.find(p => p.client_id === user.id);
-      if (clientProject) {
+      if (clientProject && users.find(u => u.id === user.id)) {
         const brochureProjectId = createBrochureProject(clientProject.id, user.id, user.name);
         const newProject = brochureProjects.find(p => p.id === brochureProjectId);
         if (newProject) {
           setCurrentProject(newProject);
           setCurrentPage(1);
         }
+      } else {
+        alert('Cannot create brochure project: Client project or profile not found.');
       }
     }
   };
