@@ -409,19 +409,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .eq('email', email)
         .single();
       
-   if (existingProfile) {
-  throw new Error(`A user with email ${email} already exists.`);
-}
-const { data, error } = await supabase.auth.signUp({
-  email,
-  password,
-  options: {
-    data: {
-      full_name,
-      role
-    }
-  }
-});
+      if (existingProfile) {
+        throw new Error(`A user with email ${email} already exists.`);
+        email, 
+        password,
+        options; {
+          data: {
+            full_name: full_name,
+            role: role
+          } 
+        }
+      const signup = await supabase.auth.signUp({ email, password });
+      
       console.log('Signup response:', signup);
       
       if (signup.error || !signup.data.user) {
