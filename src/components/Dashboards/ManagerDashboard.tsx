@@ -105,7 +105,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
     }
   };
       await refreshUsers();
-    }; catch (error) {
+    } catch (error) {
       console.error('Error creating user:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while creating the user.';
       setUserCreationError(errorMessage);
