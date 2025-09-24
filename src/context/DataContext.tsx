@@ -395,23 +395,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const createUserAccount = async (params: { email: string; password: string; full_name: string; role: 'employee' | 'client' }) => {
     if (!supabase) {
-      alert('User creation requires Supabase to be configured.');
-      return null;
+      throw new Error('User creation requires Supabase to be configured. Please check your environment variables.');
     }
     const { email, password, full_name, role } = params;
-    const signup = await supabase.auth.signUp({ email, password });
-    if (signup.error || !signup.data.user) {
-      alert(signup.error?.message || 'Failed to create user');
-      return null;
+    
+    try {
+      const signup = await supabase.auth.signUp({ email, password });
+      if (signup.error || !signup.data.user) {
+        throw new Error(signup.error?.message || 'Failed to create user account');
+      }
+      
+      const userId = signup.data.user.id;
+      const { error: upsertErr } = await supabase.from('profiles').upsert({ 
+        id: userId, 
+        full_name, 
+        role, 
+        email 
+      });
+      
+      if (upsertErr) {
+        throw new Error(`Failed to create user profile: ${upsertErr.message}`);
+      }
+      
+      // Update local state
+      setUsers(prev => [...prev, { id: userId, name: full_name, email, role } as User]);
+      return { id: userId };
+    } catch (error) {
+      console.error('Error creating user account:', error);
+      throw error; // Re-throw to let the calling component handle it
     }
-    const userId = signup.data.user.id;
-    const { error: upsertErr } = await supabase.from('profiles').upsert({ id: userId, full_name, role, email });
-    if (upsertErr) {
-      alert(upsertErr.message);
-      return null;
-    }
-    setUsers(prev => [...prev, { id: userId, name: full_name, email, role } as User]);
-    return { id: userId };
   };
 
   const refreshUsers = async () => {
