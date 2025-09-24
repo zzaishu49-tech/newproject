@@ -1010,7 +1010,7 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
 }
         setIsUserModalOpen(false);
         setUserEmail(''); setUserPassword(''); setUserFullName('');
-      }
+      
     } catch (error) {
         setUserCreationError('');
         
