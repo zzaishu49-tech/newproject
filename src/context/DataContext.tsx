@@ -434,7 +434,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
       
-      });
+      const userId = signup.data.user.id;
       // Only create profile if signup was successful and user doesn't have one
       console.log('Creating profile for user:', userId);
       
