@@ -413,7 +413,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         throw new Error(`A user with email ${email} already exists.`);
         email, 
         password,
-        options: {
+        options; {
           data: {
             full_name: full_name,
             role: role
