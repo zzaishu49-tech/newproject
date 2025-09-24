@@ -158,6 +158,7 @@ export interface BrochurePage {
 export interface BrochureProject {
   id: string;
   client_id: string;
+  project_id: string;
   client_name: string;
   status: 'draft' | 'ready_for_design' | 'in_design' | 'completed';
   created_at: string;
@@ -216,6 +217,7 @@ export interface BrochurePage {
 export interface BrochureProject {
   id: string;
   client_id: string;
+  project_id: string;
   client_name: string;
   status: 'draft' | 'ready_for_design' | 'in_design' | 'completed';
   created_at: string;

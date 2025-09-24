@@ -921,11 +921,12 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
         <div>
           {projectDetailTab === 'brochure' && (() => {
             // Find the brochure project for this client
-            const clientBrochureProject = brochureProjects.find(bp => bp.client_id === selectedProject.client_id);
+            const clientBrochureProject = brochureProjects.find(bp => bp.project_id === selectedProject.id);
             
             return (
               <BrochureDesign 
                 initialBrochureProject={clientBrochureProject}
+                projectId={selectedProject.id}
                 onBack={() => setProjectDetailTab('tasks')}
               />
             );

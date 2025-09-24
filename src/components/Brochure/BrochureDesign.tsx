@@ -142,24 +142,42 @@ export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesig
   const handleCreateProject = () => {
     if (!user) return;
     
-    // For managers and employees, create project for the first available client
-    let clientId = user.id;
-    let clientName = user.name;
-    
-    if (user.role === 'manager' || user.role === 'employee') {
-      // Find the first client or create for the current user
-      const firstClient = users.find(u => u.role === 'client');
-      if (firstClient) {
-        clientId = firstClient.id;
-        clientName = firstClient.name;
+    // If projectId is provided, use the project's client
+    if (projectId) {
+      const project = projects.find(p => p.id === projectId);
+      if (project) {
+        const brochureProjectId = createBrochureProject(projectId, project.client_id, project.client_name);
+        const newProject = brochureProjects.find(p => p.id === brochureProjectId);
+        if (newProject) {
+          setCurrentProject(newProject);
+          setCurrentPage(1);
+        }
+        return;
       }
     }
     
-    const projectId = createBrochureProject(clientId, clientName);
-    const newProject = brochureProjects.find(p => p.id === projectId);
-    if (newProject) {
-      setCurrentProject(newProject);
-      setCurrentPage(1);
+    // Fallback: For managers and employees, create project for the first available client
+    if (user.role === 'manager' || user.role === 'employee') {
+      const firstProject = projects[0];
+      if (firstProject) {
+        const brochureProjectId = createBrochureProject(firstProject.id, firstProject.client_id, firstProject.client_name);
+        const newProject = brochureProjects.find(p => p.id === brochureProjectId);
+        if (newProject) {
+          setCurrentProject(newProject);
+          setCurrentPage(1);
+        }
+      }
+    } else if (user.role === 'client') {
+      // For clients, find their project
+      const clientProject = projects.find(p => p.client_id === user.id);
+      if (clientProject) {
+        const brochureProjectId = createBrochureProject(clientProject.id, user.id, user.name);
+        const newProject = brochureProjects.find(p => p.id === brochureProjectId);
+        if (newProject) {
+          setCurrentProject(newProject);
+          setCurrentPage(1);
+        }
+      }
     }
   };
 

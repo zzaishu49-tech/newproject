@@ -364,7 +364,11 @@ export function ClientDashboard({ activeView, onViewChange }: ClientDashboardPro
 
         {/* Tab Content */}
         <div>
-          {projectDetailTab === 'brochure' && <BrochureDesign />}
+          {projectDetailTab === 'brochure' && (
+            <BrochureDesign 
+              projectId={selectedProject.id}
+            />
+          )}
           {projectDetailTab === 'comments' && <CommentManager />}
           {projectDetailTab === 'project-comments' && (
             <ProjectCommentSection project={selectedProject} />

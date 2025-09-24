@@ -1322,9 +1322,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getBrochureProjectsForReview = (): BrochureProject[] => {
-    return brochureProjects.filter(project => 
+    if (!user) return [];
+    
+    const reviewableProjects = brochureProjects.filter(project => 
       project.status === 'ready_for_design' || project.status === 'in_design'
     );
+    
+    // Filter based on user role and project access
+    if (user.role === 'manager') {
+      return reviewableProjects; // Managers can review all brochure projects
+    } else if (user.role === 'employee') {
+      // Employees can only review brochure projects for projects they're assigned to
+      const assignedProjectIds = projects
+        .filter(p => p.assigned_employees.includes(user.id))
+        .map(p => p.id);
+      return reviewableProjects.filter(bp => 
+        bp.project_id && assignedProjectIds.includes(bp.project_id)
+      );
+    } else if (user.role === 'client') {
+      // Clients can only review their own brochure projects
+      return reviewableProjects.filter(bp => bp.client_id === user.id);
+    }
+    
+    return [];
   };
 
   const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
