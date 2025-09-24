@@ -233,7 +233,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('brochure_projects')
         .select(`
           *,
-          client:profiles!brochure_projects_client_id_fkey(full_name, id)
+          client:profiles!brochure_projects_client_id_fkey(full_name)
         `);
       
       if (!error && data) {
@@ -397,7 +397,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!supabase) {
       throw new Error('User creation requires Supabase to be configured. Please check your environment variables.');
     }
-    const { email, password, full_name = 'Unknown User', role } = params;
+    const { email, password, full_name = 'Unknown User', role } = params; // Default to 'Unknown User' if not provided
     
     try {
       console.log('Attempting to create user account for:', email, 'with full_name:', full_name);
@@ -418,7 +418,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         email,
         password,
         options: {
-          data: { full_name, role }
+          data: { full_name, role } // Pass full_name and role as metadata
         }
       });
 
@@ -450,7 +450,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .upsert({
           id: userId,
-          full_name: signup.data.user.user_metadata?.full_name || full_name,
+          full_name: signup.data.user.user_metadata?.full_name || full_name, // Use metadata or fallback
           role: signup.data.user.user_metadata?.role || role,
           email
         }, {
@@ -469,7 +469,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return { id: userId };
     } catch (error) {
       console.error('Error creating user account:', error);
-      throw error;
+      throw error; // Re-throw to let the calling component handle it
     }
   };
 
@@ -491,7 +491,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('projects')
         .select(`
           *,
-          client:profiles!projects_client_id_fkey(full_name, id)
+          client:profiles!projects_client_id_fkey(full_name)
         `);
       
       if (!error && data) {
@@ -512,11 +512,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setProjects(mappedProjects);
       } else if (error) {
         console.error('Supabase error loading projects:', error);
+        // Fall back to mock data if Supabase fails
         console.log('Falling back to mock data');
         setProjects(mockProjects);
       }
     } catch (error) {
       console.error('Error loading projects:', error);
+      // Fall back to mock data if network request fails
       console.log('Network error, falling back to mock data');
       setProjects(mockProjects);
     }
@@ -527,12 +529,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     
     try {
       console.log('Loading tasks from Supabase...');
+      
       const { data, error } = await supabase
         .from('tasks')
         .select('*');
       
       if (!error && data) {
-        console.log('Raw tasks data from Supabase:', data);
+      console.log('Raw tasks data from Supabase:', data);
+      
         const mappedTasks: Task[] = data.map((t: any) => ({
           id: t.id,
           project_id: t.project_id,
@@ -546,10 +550,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
           created_at: t.created_at,
           updated_at: t.updated_at
         }));
+        
         console.log('Mapped tasks:', mappedTasks);
         setTasks(mappedTasks);
       } else if (error) {
         console.error('Supabase error loading tasks:', error);
+        // Keep existing tasks or set empty array
         console.log('Error loading tasks, keeping existing state');
       }
     } catch (error) {
@@ -557,7 +563,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.log('Network error loading tasks, keeping existing state');
     }
   };
-
   useEffect(() => {
     refreshUsers();
     loadProjects();
@@ -567,19 +572,68 @@ export function DataProvider({ children }: { children: ReactNode }) {
     loadBrochurePages();
     loadPageComments();
     
+    // Set up real-time subscriptions
     if (supabase) {
-      const subscriptions = [
-        supabase.channel('projects').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => loadProjects()).subscribe(),
-        supabase.channel('profiles').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => refreshUsers()).subscribe(),
-        supabase.channel('tasks').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => loadTasks()).subscribe(),
-        supabase.channel('global_comments').on('postgres_changes', { event: '*', schema: 'public', table: 'global_comments' }, () => loadGlobalComments()).subscribe(),
-        supabase.channel('brochure_projects').on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_projects' }, () => loadBrochureProjects()).subscribe(),
-        supabase.channel('brochure_pages').on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_pages' }, () => loadBrochurePages()).subscribe(),
-        supabase.channel('page_comments').on('postgres_changes', { event: '*', schema: 'public', table: 'page_comments' }, () => loadPageComments()).subscribe(),
-      ];
+      const projectsSubscription = supabase
+        .channel('projects')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+          loadProjects();
+        })
+        .subscribe();
 
-      return () => subscriptions.forEach(sub => supabase.removeChannel(sub));
+      const profilesSubscription = supabase
+        .channel('profiles')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+          refreshUsers();
+        })
+        .subscribe();
+
+      const tasksSubscription = supabase
+        .channel('tasks')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+          loadTasks();
+        })
+        .subscribe();
+
+      const globalCommentsSubscription = supabase
+        .channel('global_comments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'global_comments' }, () => {
+          loadGlobalComments();
+        })
+        .subscribe();
+
+      const brochureProjectsSubscription = supabase
+        .channel('brochure_projects')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_projects' }, () => {
+          loadBrochureProjects();
+        })
+        .subscribe();
+
+      const brochurePagesSubscription = supabase
+        .channel('brochure_pages')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'brochure_pages' }, () => {
+          loadBrochurePages();
+        })
+        .subscribe();
+
+      const pageCommentsSubscription = supabase
+        .channel('page_comments')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'page_comments' }, () => {
+          loadPageComments();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(projectsSubscription);
+        supabase.removeChannel(profilesSubscription);
+        supabase.removeChannel(tasksSubscription);
+        supabase.removeChannel(globalCommentsSubscription);
+        supabase.removeChannel(brochureProjectsSubscription);
+        supabase.removeChannel(brochurePagesSubscription);
+        supabase.removeChannel(pageCommentsSubscription);
+      };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-generate stages for new projects
@@ -612,6 +666,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const file = files.find(f => f.id === fileId);
     if (!file || !user) return;
 
+    // Update download count and last downloaded info
     setFiles(prev => prev.map(f => 
       f.id === fileId 
         ? { 
@@ -623,6 +678,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         : f
     ));
 
+    // Add to download history
     const historyEntry: DownloadHistory = {
       id: uuidv4(),
       file_id: fileId,
@@ -634,6 +690,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
     setDownloadHistory(prev => [...prev, historyEntry]);
 
+    // Trigger actual download
     const link = document.createElement('a');
     link.href = file.file_url;
     link.download = file.filename;
@@ -644,7 +701,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const filesToDownload = files.filter(f => fileIds.includes(f.id));
-    filesToDownload.forEach(file => setTimeout(() => downloadFile(file.id), 100));
+    
+    // In a real implementation, this would create a zip file on the server
+    // For now, we'll download files individually
+    filesToDownload.forEach(file => {
+      setTimeout(() => downloadFile(file.id), 100);
+    });
   };
 
   const getDownloadHistory = (): DownloadHistory[] => {
@@ -652,6 +714,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .filter(entry => {
         const file = files.find(f => f.id === entry.file_id);
         if (!file) return false;
+        
+        // Filter based on user role and project access
         if (user?.role === 'manager') return true;
         if (user?.role === 'employee') {
           const project = projects.find(p => p.id === file.project_id);
@@ -663,7 +727,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateFileMetadata = (fileId: string, metadata: Partial<File>) => {
-    setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...metadata } : f));
+    setFiles(prev => prev.map(f => 
+      f.id === fileId ? { ...f, ...metadata } : f
+    ));
   };
 
   const createProject = async (projectData: Omit<Project, 'id' | 'created_at'>) => {
@@ -689,6 +755,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        // Create default stages for the new project
         if (data) {
           const stageInserts = STAGE_NAMES.map((stageName, index) => ({
             project_id: data.id,
@@ -698,15 +765,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
             approval_status: 'pending',
             order: index
           }));
+
           await supabase.from('stages').insert(stageInserts);
         }
 
+        // Refresh projects to get the updated list
         await loadProjects();
       } catch (error) {
         console.error('Error creating project:', error);
         throw error;
       }
     } else {
+      // Fallback to local state if Supabase is not available
       const newProject: Project = {
         ...projectData,
         id: uuidv4(),
@@ -738,12 +808,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        // Refresh projects to get the updated list
         await loadProjects();
       } catch (error) {
         console.error('Error updating project:', error);
         throw error;
       }
     } else {
+      // Fallback to local state if Supabase is not available
       setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     }
   };
@@ -755,7 +827,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setCommentTasks(prev => [...prev, newCommentTask]);
-    if (supabase) await supabase.from('comment_tasks').insert(newCommentTask);
+    if (supabase) {
+      await supabase.from('comment_tasks').insert(newCommentTask);
+    } else {
+      console.error('Supabase not configured - comment task not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const addGlobalComment = async (data: { project_id: string; text: string; added_by: string; author_role: string }) => {
@@ -764,6 +840,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw new Error('Comment text is required');
     }
 
+    // Get author name from users array
     const author = users.find(u => u.id === data.added_by);
     const authorName = author?.name || 'Unknown User';
 
@@ -791,20 +868,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
         console.error('Error adding global comment:', error);
         throw error;
       }
+      // Reload comments to get the updated list with proper author names
       await loadGlobalComments();
     } else {
+      // Fallback to local state if Supabase is not available
       setGlobalComments(prev => [...prev, newGlobalComment]);
+      console.error('Supabase not configured - global comment not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
     }
   };
 
   const updateCommentTaskStatus = async (taskId: string, status: 'open' | 'in-progress' | 'done') => {
-    setCommentTasks(prev => prev.map(task => task.id === taskId ? { ...task, status } : task));
-    if (supabase) await supabase.from('comment_tasks').update({ status }).eq('id', taskId);
+    setCommentTasks(prev => prev.map(task => 
+      task.id === taskId ? { ...task, status } : task
+    ));
+    if (supabase) {
+      await supabase.from('comment_tasks').update({ status }).eq('id', taskId);
+    } else {
+      console.error('Supabase not configured - comment task status not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateStageApproval = async (stageId: string, status: 'approved' | 'rejected', comment?: string) => {
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, approval_status: status } : s));
-    if (supabase) await supabase.from('stages').update({ approval_status: status }).eq('id', stageId);
+    setStages(prev => prev.map(s => 
+      s.id === stageId ? { ...s, approval_status: status } : s
+    ));
+    if (supabase) {
+      await supabase.from('stages').update({ approval_status: status }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage approval not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
     
     if (comment) {
       const stage = stages.find(s => s.id === stageId);
@@ -829,9 +921,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timestamp: new Date().toISOString()
     };
     setFiles(prev => [...prev, newFile]);
-    if (supabase) await supabase.from('files').insert(newFile);
+    if (supabase) {
+      await supabase.from('files').insert(newFile);
+    } else {
+      console.error('Supabase not configured - file not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
+  // Fix for FileManager component - handle File object upload
   const uploadFileFromInput = (stageId: string, file: globalThis.File, uploaderName: string) => {
     const fileType = file.name.split('.').pop()?.toLowerCase() || 'unknown';
     const newFile: File = {
@@ -855,8 +952,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateStageProgress = async (stageId: string, progress: number) => {
-    setStages(prev => prev.map(s => s.id === stageId ? { ...s, progress_percentage: progress } : s));
-    if (supabase) await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId);
+    setStages(prev => prev.map(s => 
+      s.id === stageId ? { ...s, progress_percentage: progress } : s
+    ));
+    if (supabase) {
+      await supabase.from('stages').update({ progress_percentage: progress }).eq('id', stageId);
+    } else {
+      console.error('Supabase not configured - stage progress not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const scheduleMeeting = async (meetingData: Omit<Meeting, 'id'>) => {
@@ -865,7 +968,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       id: uuidv4()
     };
     setMeetings(prev => [...prev, newMeeting]);
-    if (supabase) await supabase.from('meetings').insert(newMeeting);
+    if (supabase) {
+      await supabase.from('meetings').insert(newMeeting);
+    } else {
+      console.error('Supabase not configured - meeting not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const createTask = async (taskData: Omit<Task, 'id' | 'created_at'>) => {
@@ -881,6 +988,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           deadline: taskData.deadline || null
         };
 
+        console.log('Creating task with data:', taskToInsert);
+
         const { data, error } = await supabase
           .from('tasks')
           .insert(taskToInsert)
@@ -889,15 +998,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error('Error creating task:', error);
+          console.error('Error details:', error.message, error.details, error.hint);
           throw error;
         }
 
+        console.log('Task created successfully:', data);
+
+        // Refresh tasks to get the updated list
         await loadTasks();
       } catch (error) {
         console.error('Error creating task:', error);
+        // Re-throw with more specific error message
         throw new Error(`Failed to create task: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } else {
+      // Fallback to local state if Supabase is not available
       const newTask: Task = {
         ...taskData,
         id: uuidv4(),
@@ -921,13 +1036,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        // Refresh tasks to get the updated list
         await loadTasks();
       } catch (error) {
         console.error('Error updating task status:', error);
         throw error;
       }
     } else {
-      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, status } : task));
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, status } : task
+      ));
     }
   };
 
@@ -951,13 +1070,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        // Refresh tasks to get the updated list
         await loadTasks();
       } catch (error) {
         console.error('Error updating task:', error);
         throw error;
       }
     } else {
-      setTasks(prev => prev.map(task => task.id === taskId ? { ...task, ...updates } : task));
+      // Fallback to local state if Supabase is not available
+      setTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, ...updates } : task
+      ));
     }
   };
 
@@ -974,12 +1097,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw error;
         }
 
+        // Refresh tasks to get the updated list
         await loadTasks();
       } catch (error) {
         console.error('Error deleting task:', error);
         throw error;
       }
     } else {
+      // Fallback to local state if Supabase is not available
       setTasks(prev => prev.filter(task => task.id !== taskId));
     }
   };
@@ -993,10 +1118,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         client_id: clientId,
         status: 'draft'
       }).then(({ error }) => {
-        if (error) console.error('Error creating brochure project:', error);
-        else loadBrochureProjects();
+        if (error) {
+          console.error('Error creating brochure project:', error);
+        } else {
+          loadBrochureProjects(); // Reload to get updated data
+        }
       });
     } else {
+      // Fallback to local state
       const newProject: BrochureProject = {
         id: projectId,
         client_id: clientId,
@@ -1022,9 +1151,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         })
         .eq('id', id);
       
-      if (error) console.error('Error updating brochure project:', error);
-      else loadBrochureProjects();
+      if (error) {
+        console.error('Error updating brochure project:', error);
+      } else {
+        loadBrochureProjects(); // Reload to get updated data
+      }
     } else {
+      // Fallback to local state
       setBrochureProjects(prev => prev.map(project => 
         project.id === id ? { ...project, ...updates, updated_at: new Date().toISOString() } : project
       ));
@@ -1033,6 +1166,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const saveBrochurePage = async (pageData: Omit<BrochurePage, 'id' | 'created_at' | 'updated_at'>) => {
     if (supabase) {
+      // Check if page exists
       const { data: existingPage } = await supabase
         .from('brochure_pages')
         .select('id')
@@ -1041,6 +1175,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .single();
 
       if (existingPage) {
+        // Update existing page
         const { error } = await supabase
           .from('brochure_pages')
           .update({ 
@@ -1049,11 +1184,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
             updated_at: new Date().toISOString() 
           })
           .eq('id', existingPage.id);
+        
         if (error) {
           console.error('Error updating brochure page:', error);
           throw error;
         }
       } else {
+        // Create new page
         const { error } = await supabase
           .from('brochure_pages')
           .insert({
@@ -1063,24 +1200,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
             approval_status: pageData.approval_status || 'pending',
             is_locked: pageData.is_locked || false
           });
+        
         if (error) {
           console.error('Error creating brochure page:', error);
           throw error;
         }
       }
+      
+      // Reload pages to get updated data
       loadBrochurePages();
     } else {
+      // Fallback to local state
       const existingPageIndex = brochurePages.findIndex(
         page => page.project_id === pageData.project_id && page.page_number === pageData.page_number
       );
 
       if (existingPageIndex >= 0) {
+        // Update existing page
         setBrochurePages(prev => prev.map((page, index) => 
           index === existingPageIndex 
             ? { ...page, content: pageData.content, updated_at: new Date().toISOString() }
             : page
         ));
       } else {
+        // Create new page
         const newPage: BrochurePage = {
           ...pageData,
           approval_status: pageData.approval_status ?? 'pending',
@@ -1091,32 +1234,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         };
         setBrochurePages(prev => [...prev, newPage]);
       }
+      // Return resolved promise for consistency
       return Promise.resolve();
     }
   };
 
   const getBrochurePages = (projectId: string): BrochurePage[] => {
-    if (!user) return [];
-
-    const project = projects.find(p => p.id === projectId);
-    if (!project) return [];
-
-    // Check access based on role
-    const hasAccess = (userRole: string, userId: string, clientId: string) => {
-      switch (userRole) {
-        case 'manager':
-          return true; // Managers have access to all their projects
-        case 'employee':
-          return project.assigned_employees.includes(userId);
-        case 'client':
-          return project.client_id === userId;
-        default:
-          return false;
-      }
-    };
-
     return brochurePages
-      .filter(page => page.project_id === projectId && hasAccess(user.role, user.id, project.client_id))
+      .filter(page => page.project_id === projectId)
       .sort((a, b) => a.page_number - b.page_number);
   };
 
@@ -1132,9 +1257,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           marked_done: commentData.marked_done || false,
           action_type: commentData.action_type
         });
-      if (error) console.error('Error adding page comment:', error);
-      else loadPageComments();
+      
+      if (error) {
+        console.error('Error adding page comment:', error);
+      } else {
+        loadPageComments(); // Reload to get updated data
+      }
     } else {
+      // Fallback to local state
       const newComment: PageComment = {
         ...commentData,
         id: uuidv4(),
@@ -1156,10 +1286,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('page_comments')
         .update({ marked_done: true })
         .eq('id', commentId);
-      if (error) console.error('Error marking comment done:', error);
-      else loadPageComments();
+      
+      if (error) {
+        console.error('Error marking comment done:', error);
+      } else {
+        loadPageComments(); // Reload to get updated data
+      }
     } else {
-      setPageComments(prev => prev.map(comment => comment.id === commentId ? { ...comment, marked_done: true } : comment));
+      // Fallback to local state
+      setPageComments(prev => prev.map(comment => 
+        comment.id === commentId ? { ...comment, marked_done: true } : comment
+      ));
     }
   };
 
@@ -1168,7 +1305,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       page.id === pageId ? { ...page, approval_status: status, updated_at: new Date().toISOString() } : page
     ));
     
-    const actionText = status === 'approved'
+    // Add approval action comment
+    const actionText = status === 'approved' 
       ? `Page has been approved by ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}`
       : `Page requires changes - ${user?.name || 'Manager'}${comment ? `: ${comment}` : ''}`;
     
@@ -1184,9 +1322,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const getBrochureProjectsForReview = (): BrochureProject[] => {
-    return brochureProjects.filter(project => 
+    if (!user) return [];
+    
+    const reviewableProjects = brochureProjects.filter(project => 
       project.status === 'ready_for_design' || project.status === 'in_design'
     );
+    
+    // Filter based on user role and project access
+    if (user.role === 'manager') {
+      return reviewableProjects; // Managers can review all brochure projects
+    } else if (user.role === 'employee') {
+      // Employees can only review brochure projects for projects they're assigned to
+      const assignedProjectIds = projects
+        .filter(p => p.assigned_employees.includes(user.id))
+        .map(p => p.id);
+      return reviewableProjects.filter(bp => 
+        bp.project_id && assignedProjectIds.includes(bp.project_id)
+      );
+    } else if (user.role === 'client') {
+      // Clients can only review their own brochure projects
+      return reviewableProjects.filter(bp => bp.client_id === user.id);
+    }
+    
+    return [];
   };
 
   const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'updated_at'>) => {
@@ -1197,19 +1355,33 @@ export function DataProvider({ children }: { children: ReactNode }) {
       updated_at: new Date().toISOString()
     };
     setLeads(prev => [...prev, newLead]);
-    if (supabase) await supabase.from('leads').insert(newLead);
+    if (supabase) {
+      await supabase.from('leads').insert(newLead);
+    } else {
+      console.error('Supabase not configured - lead not saved to database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     setLeads(prev => prev.map(lead => 
-      lead.id === id ? { ...lead, ...updates, updated_at: new Date().toISOString() } : lead
+      lead.id === id 
+        ? { ...lead, ...updates, updated_at: new Date().toISOString() }
+        : lead
     ));
-    if (supabase) await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    if (supabase) {
+      await supabase.from('leads').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not updated in database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const deleteLead = async (id: string) => {
     setLeads(prev => prev.filter(lead => lead.id !== id));
-    if (supabase) await supabase.from('leads').delete().eq('id', id);
+    if (supabase) {
+      await supabase.from('leads').delete().eq('id', id);
+    } else {
+      console.error('Supabase not configured - lead not deleted from database. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    }
   };
 
   const lockBrochurePage = async (pageId: string) => {
@@ -1226,9 +1398,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           updated_at: new Date().toISOString() 
         })
         .eq('id', pageId);
-      if (error) console.error('Error locking page:', error);
-      else loadBrochurePages();
+      
+      if (error) {
+        console.error('Error locking page:', error);
+      } else {
+        loadBrochurePages(); // Reload to get updated data
+      }
     } else {
+      // Fallback to local state
       setBrochurePages(prev => prev.map(page => 
         page.id === pageId 
           ? { 
@@ -1256,9 +1433,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
           updated_at: new Date().toISOString() 
         })
         .eq('id', pageId);
-      if (error) console.error('Error unlocking page:', error);
-      else loadBrochurePages();
+      
+      if (error) {
+        console.error('Error unlocking page:', error);
+      } else {
+        loadBrochurePages(); // Reload to get updated data
+      }
     } else {
+      // Fallback to local state
       setBrochurePages(prev => prev.map(page => 
         page.id === pageId 
           ? { 
@@ -1337,4 +1519,4 @@ export function useData() {
     throw new Error('useData must be used within a DataProvider');
   }
   return context;
-}
+} 
