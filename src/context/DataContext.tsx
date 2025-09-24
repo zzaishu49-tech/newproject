@@ -397,12 +397,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (!supabase) {
       throw new Error('User creation requires Supabase to be configured. Please check your environment variables.');
     }
-    const { email, password, full_name, role } = params;
+    const { email, password, full_name = 'Unknown User', role } = params; // Default to 'Unknown User' if not provided
     
     try {
-      console.log('Attempting to create user account for:', email);
-      
-      // First check if user already exists by trying to get profile
+      console.log('Attempting to create user account for:', email, 'with full_name:', full_name);
+
+      // Check if user already exists
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('email')
@@ -412,15 +412,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (existingProfile) {
         throw new Error(`A user with email ${email} already exists.`);
       }
-      
-      const signup = await supabase.auth.signUp({ email, password });
-      
+
+      // Sign up with full_name and role in metadata
+      const signup = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name, role } // Pass full_name and role as metadata
+        }
+      });
+
       console.log('Signup response:', signup);
-      
+
       if (signup.error || !signup.data.user) {
         console.error('Signup error:', signup.error);
-        
-        // Handle specific Supabase errors
         if (signup.error?.message?.includes('Database error saving new user')) {
           throw new Error('Unable to create user account. This may be due to server configuration. Please contact your administrator or try again later.');
         } else if (signup.error?.message?.includes('User already registered')) {
@@ -433,34 +438,32 @@ export function DataProvider({ children }: { children: ReactNode }) {
           throw new Error(signup.error?.message || 'Failed to create user account. Please try again.');
         }
       }
-      
+
       const userId = signup.data.user.id;
-      // Only create profile if signup was successful and user doesn't have one
       console.log('Creating profile for user:', userId);
-      
-      // Wait a moment for auth user to be fully created
+
+      // Wait briefly for auth user to be fully created
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
+      // Upsert profile with metadata or provided full_name
       const { error: upsertErr } = await supabase
         .from('profiles')
-        .upsert({ 
-          id: userId, 
-          full_name, 
-          role, 
-          email 
+        .upsert({
+          id: userId,
+          full_name: signup.data.user.user_metadata?.full_name || full_name, // Use metadata or fallback
+          role: signup.data.user.user_metadata?.role || role,
+          email
         }, {
           onConflict: 'id'
         });
-      
+
       if (upsertErr) {
         console.error('Profile creation error:', upsertErr);
-        // If profile creation fails, we should still consider the user created
-        // since the auth user exists, but warn about the profile issue
         console.warn('User account created but profile setup failed. User may need to complete profile setup.');
       }
-      
+
       console.log('User account created successfully:', userId);
-      
+
       // Update local state
       setUsers(prev => [...prev, { id: userId, name: full_name, email, role } as User]);
       return { id: userId };
