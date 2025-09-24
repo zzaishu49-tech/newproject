@@ -21,9 +21,10 @@ import {
 interface BrochureDesignProps {
   initialBrochureProject?: BrochureProject;
   onBack?: () => void;
+  projectId?: string;
 }
 
-export function BrochureDesign({ initialBrochureProject, onBack }: BrochureDesignProps = {}) {
+export function BrochureDesign({ initialBrochureProject, onBack, projectId }: BrochureDesignProps = {}) {
   const { user } = useAuth();
   const { 
     brochureProjects, 
