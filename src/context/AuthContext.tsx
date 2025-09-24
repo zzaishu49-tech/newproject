@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('profiles')
       .select('id, full_name, role, email')
       .eq('id', data.user.id)
-      .single();
+      .maybeSingle();
     const mappedUser: User = {
       id: data.user.id,
       name: profile?.full_name || (data.user.email || 'User'),

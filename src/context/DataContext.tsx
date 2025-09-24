@@ -407,7 +407,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('email')
         .eq('email', email)
-        .single();
+        .maybeSingle();
       
       if (existingProfile) {
         throw new Error(`A user with email ${email} already exists.`);
