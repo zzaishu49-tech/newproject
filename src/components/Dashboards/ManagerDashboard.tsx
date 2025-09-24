@@ -75,44 +75,38 @@ export function ManagerDashboard({ activeView, onViewChange }: ManagerDashboardP
   const handleCreateUser = async () => {
     setUserCreationError('');
     setCreatingUser(true);
-    
-    try {
-      // Basic validation
-      if (!userFullName.trim()) {
-        throw new Error('Full name is required.');
-      }
-      if (!userEmail.trim()) {
-        throw new Error('Email is required.');
-      }
-      if (!userPassword.trim()) {
-        throw new Error('Password is required.');
-      }
-      if (userPassword.length < 6) {
-        throw new Error('Password must be at least 6 characters long.');
-      }
-      
-      console.log('Creating user with role:', userRoleToCreate);
-      
-      const res = await createUserAccount({ email: userEmail, password: userPassword, full_name: userFullName, role: userRoleToCreate });
-      
-      console.log('User created successfully:', res);
-      
-      // Clear form and close modal
-      setIsUserModalOpen(false);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      setUserCreationError(error instanceof Error ? error.message : 'Failed to create user');
-    }
-  };
-      await refreshUsers();
-    } catch (error) {
-      console.error('Error creating user:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred while creating the user.';
-      setUserCreationError(errorMessage);
-    } finally {
-      setCreatingUser(false);
-    }
-  };
+  try {
+  // Basic validation
+  if (!userFullName.trim()) {
+    throw new Error('Full name is required.');
+  }
+  if (!userEmail.trim()) {
+    throw new Error('Email is required.');
+  }
+  if (!userPassword.trim()) {
+    throw new Error('Password is required.');
+  }
+  if (userPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
+  
+  console.log('Creating user with role:', userRoleToCreate);
+  
+  const res = await createUserAccount({ email: userEmail, password: userPassword, full_name: userFullName, role: userRoleToCreate });
+  
+  console.log('User created successfully:', res);
+  
+  // Refresh users after successful creation
+  await refreshUsers();
+  
+  // Clear form and close modal
+  setIsUserModalOpen(false);
+} catch (error) {
+  console.error('Error creating user:', error);
+  setUserCreationError(error instanceof Error ? error.message : 'Failed to create user');
+} finally {
+  setCreatingUser(false);
+}
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
