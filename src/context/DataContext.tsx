@@ -416,7 +416,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         options; {
           data: {
             full_name: full_name,
-            role: role
+            role: role;
           }
         }
       const signup = await supabase.auth.signUp({ email, password });
